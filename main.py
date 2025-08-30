@@ -1,3 +1,4 @@
+# Clipr: An app that takes a video and converts it to clips of equal length
 from moviepy.editor import VideoFileClip
 import os
 from tqdm import tqdm
