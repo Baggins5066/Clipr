@@ -1,27 +1,43 @@
-from moviepy.editor import VideoFileClip
+import os
+import subprocess
+import math
+def get_video_duration(video_path):
+    # Use ffprobe to get video duration
+    result = subprocess.run([
+        'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+        '-of', 'default=noprint_wrappers=1:nokey=1', video_path
+    ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    try:
+        return float(result.stdout)
+    except Exception:
+        print('Could not get video duration.')
+        return None
 
-def split_video(input_path, segment_length, output_prefix="clip"):
-    # Load video
-    video = VideoFileClip(input_path)
-    duration = video.duration  # total length in seconds
-    
-    # Loop through segments
-    start = 0
-    part = 1
-    while start < duration:
-        end = min(start + segment_length, duration)
-        clip = video.subclip(start, end)
-        output_name = f"{output_prefix}_{part}.mp4"
-        print(f"Exporting {output_name} ({start:.0f}s - {end:.0f}s)...")
-        clip.write_videofile(output_name, codec="libx264", audio_codec="aac", verbose=False, logger=None)
-        start += segment_length
-        part += 1
+def split_video_ffmpeg(video_path, clip_length, output_folder):
+    duration = get_video_duration(video_path)
+    if duration is None:
+        print('Error: Unable to get video duration.')
+        return
+    num_clips = math.ceil(duration / clip_length)
+    base_name = os.path.splitext(os.path.basename(video_path))[0]
+    os.makedirs(output_folder, exist_ok=True)
+    for i in range(num_clips):
+        start = i * clip_length
+        out_file = os.path.join(output_folder, f"{base_name}_part{i+1}.mp4")
+        cmd = [
+            'ffmpeg', '-y', '-i', video_path,
+            '-ss', str(start), '-t', str(clip_length),
+            '-c', 'copy', out_file
+        ]
+        print(f"Creating clip {i+1}/{num_clips}: {out_file}")
+        subprocess.run(cmd)
+    print('Splitting complete!')
+
+def main():
+    video_path = input('Enter path to video file: ')
+    clip_length = float(input('Enter clip length in seconds: '))
+    output_folder = input('Enter output folder for clips: ')
+    split_video_ffmpeg(video_path, clip_length, output_folder)
 
 if __name__ == "__main__":
-    # Ask user for inputs
-    input_path = input("Enter the path to your video file: ").strip()
-    minutes = float(input("Enter clip length in minutes: "))
-    segment_length = int(minutes * 60)  # convert to seconds
-    
-    split_video(input_path, segment_length)
-    print("✅ Splitting complete!")
+    main()
