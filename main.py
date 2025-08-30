@@ -28,8 +28,17 @@ def split_video(input_path, segment_length, export_dir="Clips", output_prefix="c
                     self.pbar.n = self.pbar.total
                     self.pbar.refresh()
                     self.pbar.close()
-            def iter_bar(self, chunk):
-                for i in chunk:
+            def iter_bar(self, **kwargs):
+                # MoviePy passes the iterable as a keyword argument, e.g. t=...
+                iterable = None
+                if 'chunk' in kwargs:
+                    iterable = kwargs['chunk']
+                elif 't' in kwargs:
+                    iterable = kwargs['t']
+                else:
+                    # fallback: get the first value
+                    iterable = next(iter(kwargs.values()))
+                for i in iterable:
                     self.pbar.update(1)
                     yield i
                 self.pbar.close()
