@@ -49,12 +49,67 @@ def split_video(input_path, segment_length, export_dir="Clips", output_prefix="c
         part += 1
 
 if __name__ == "__main__":
-    # Ask user for inputs
-    input_path = input("Enter the path to your video file: ").strip()
-    seconds = float(input("Enter clip length in seconds: "))
-    segment_length = int(seconds)  # convert to seconds
-    export_dir = input("Enter export directory for clips (default: Clips): ").strip()
-    if not export_dir:
-        export_dir = "Clips"
-    split_video(input_path, segment_length, export_dir)
-    print("✅ Splitting complete!")
+    import sys
+    import msvcrt
+
+    def get_input_with_escape(prompt):
+        print(prompt, end='', flush=True)
+        chars = []
+        while True:
+            ch = msvcrt.getwch()
+            if ch == '\r' or ch == '\n':
+                print()
+                return ''.join(chars)
+            elif ch == '\x1b':  # ESC key
+                print("\nESC pressed. Exiting program.")
+                sys.exit(0)
+            elif ch == '\x08':  # Backspace
+                if chars:
+                    chars.pop()
+                    print('\b \b', end='', flush=True)
+            else:
+                chars.append(ch)
+                print(ch, end='', flush=True)
+
+    while True:
+        # Ask user for inputs
+        input_path = get_input_with_escape("Enter the path to your video file: ").strip()
+        seconds_str = get_input_with_escape("Enter clip length in seconds: ").strip()
+        try:
+            seconds = float(seconds_str)
+        except ValueError:
+            print("Invalid number for clip length. Try again.")
+            continue
+        segment_length = int(seconds)
+        export_dir = get_input_with_escape("Enter export directory for clips (default: Clips): ").strip()
+        if not export_dir:
+            export_dir = "Clips"
+
+        # Gather video info
+        try:
+            video = VideoFileClip(input_path)
+            duration = video.duration
+        except Exception as e:
+            print(f"Error loading video: {e}")
+            continue
+
+        num_clips = int((duration + segment_length - 1) // segment_length)
+        est_time = duration  # rough estimate: 1x video duration
+        print(f"\nVideo info:")
+        print(f"- Duration: {duration:.2f} seconds")
+        print(f"- Clip length: {segment_length} seconds")
+        print(f"- Number of clips: {num_clips}")
+        print(f"- Estimated processing time: {est_time:.1f} seconds (actual may vary)")
+        print(f"- Export directory: {export_dir}")
+
+        confirm = get_input_with_escape("\nPress Enter to start processing, or type 'cancel' to restart: ").strip().lower()
+        if confirm == "cancel":
+            print("Restarting...\n")
+            continue
+        elif confirm != "":
+            print("No confirmation received. Exiting.")
+            sys.exit(0)
+        else:
+            split_video(input_path, segment_length, export_dir)
+            print("✅ Splitting complete!")
+            break
