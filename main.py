@@ -91,7 +91,8 @@ if __name__ == "__main__":
     while True:
         # Open file picker automatically
         input_path = pick_video_file()
-        seconds_str = get_input_with_escape("Enter clip length in seconds: ").strip()
+        print(f"\nSelected file: \033[94m{os.path.basename(input_path)}\033[0m")
+        seconds_str = get_input_with_escape("Enter clip length in seconds:\n> ").strip()
         try:
             seconds = float(seconds_str)
         except ValueError:
