@@ -61,7 +61,7 @@ if __name__ == "__main__":
                 print()
                 return ''.join(chars)
             elif ch == '\x1b':  # ESC key
-                print("\nESC pressed. Exiting program.")
+                print("\nESC pressed. Exited program.")
                 sys.exit(0)
             elif ch == '\x08':  # Backspace
                 if chars:
@@ -71,9 +71,25 @@ if __name__ == "__main__":
                 chars.append(ch)
                 print(ch, end='', flush=True)
 
+    import tkinter as tk
+    from tkinter import filedialog
+
+    def pick_video_file():
+        root = tk.Tk()
+        root.withdraw()
+        file_path = filedialog.askopenfilename(
+            title="Select video file",
+            filetypes=[("Video files", "*.mp4;*.avi;*.mov;*.mkv;*.flv;*.wmv"), ("All files", "*.*")]
+        )
+        root.destroy()
+        if not file_path:
+            print("No file selected. Exiting.")
+            sys.exit(0)
+        return file_path
+
     while True:
-        # Ask user for inputs
-        input_path = get_input_with_escape("Enter the path to your video file: ").strip()
+        # Open file picker automatically
+        input_path = pick_video_file()
         seconds_str = get_input_with_escape("Enter clip length in seconds: ").strip()
         try:
             seconds = float(seconds_str)
