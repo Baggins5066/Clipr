@@ -87,6 +87,7 @@ if __name__ == "__main__":
             sys.exit(0)
         return file_path
 
+    import preferences
     while True:
         # Open file picker automatically
         input_path = pick_video_file()
@@ -97,9 +98,7 @@ if __name__ == "__main__":
             print("Invalid number for clip length. Try again.")
             continue
         segment_length = int(seconds)
-        export_dir = get_input_with_escape("Enter export directory for clips (default: Clips): ").strip()
-        if not export_dir:
-            export_dir = "Clips"
+        export_dir = preferences.EXPORT_LOCATION
 
         # Gather video info
         try:
@@ -118,7 +117,7 @@ if __name__ == "__main__":
         print(f"- Estimated processing time: {est_time:.1f} seconds (actual may vary)")
         print(f"- Export directory: {export_dir}")
 
-        confirm = get_input_with_escape("\nPress Enter to start processing, or type 'cancel' to restart: ").strip().lower()
+        confirm = get_input_with_escape("\n[ENTER] Start splitting\n[ESC] Cancel\n>").strip().lower()
         if confirm == "cancel":
             print("Restarting...\n")
             continue
