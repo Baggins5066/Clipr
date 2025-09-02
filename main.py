@@ -16,7 +16,7 @@ def split_video(input_path, segment_length, export_dir="Clips", output_prefix="c
         end = min(start + segment_length, duration)
         clip = video.subclip(start, end)
         output_name = os.path.join(export_dir, f"{output_prefix}_{part}.mp4")
-        print(f"Exporting {output_name} ({start:.0f}s - {end:.0f}s)...")
+        print(f"\033[97mExporting\033[0m \033[37m{output_name} ({start:.0f}s - {end:.0f}s)...\033[0m")
         clip_duration = end - start
         class TqdmLogger:
             def __init__(self, total):
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     import msvcrt
 
     def get_input_with_escape(prompt):
-        print(prompt, end='', flush=True)
+        print(f"\033[97m{prompt}\033[0m", end='', flush=True)
         chars = []
         while True:
             ch = msvcrt.getwch()
@@ -83,7 +83,7 @@ if __name__ == "__main__":
         )
         root.destroy()
         if not file_path:
-            print("No file selected. Exiting.")
+            print("\033[97mNo file selected.\033[0m \033[37mExiting.\033[0m")
             sys.exit(0)
         return file_path
 
@@ -91,12 +91,12 @@ if __name__ == "__main__":
     while True:
         # Open file picker automatically
         input_path = pick_video_file()
-        print(f"\nSelected file: \033[94m{os.path.basename(input_path)}\033[0m")
+        print(f"\n\033[97mSelected file: \033[94m{os.path.basename(input_path)}\033[0m")
         seconds_str = get_input_with_escape("Enter clip length in seconds:\n> ").strip()
         try:
             seconds = float(seconds_str)
         except ValueError:
-            print("Invalid number for clip length. Try again.")
+            print("\033[97mInvalid number for clip length.\033[0m \033[37mTry again.\033[0m")
             continue
         segment_length = int(seconds)
         export_dir = preferences.EXPORT_LOCATION
@@ -106,26 +106,26 @@ if __name__ == "__main__":
             video = VideoFileClip(input_path)
             duration = video.duration
         except Exception as e:
-            print(f"Error loading video: {e}")
+            print(f"\033[97mError loading video:\033[0m \033[37m{e}\033[0m")
             continue
 
         num_clips = int((duration + segment_length - 1) // segment_length)
         est_time = duration  # rough estimate: 1x video duration
-        print(f"\nVideo info:")
-        print(f"- Duration: {duration:.2f} seconds")
-        print(f"- Clip length: {segment_length} seconds")
-        print(f"- Number of clips: {num_clips}")
-        print(f"- Estimated processing time: {est_time:.1f} seconds (actual may vary)")
-        print(f"- Export directory: {export_dir}")
+        print(f"\n\033[97mVideo info:\033[0m")
+        print(f"\033[97m- Duration:\033[0m \033[37m{duration:.2f} seconds\033[0m")
+        print(f"\033[97m- Clip length:\033[0m \033[37m{segment_length} seconds\033[0m")
+        print(f"\033[97m- Number of clips:\033[0m \033[37m{num_clips}\033[0m")
+        print(f"\033[97m- Estimated processing time:\033[0m \033[37m{est_time:.1f} seconds (actual may vary)\033[0m")
+        print(f"\033[97m- Export directory:\033[0m \033[37m{export_dir}\033[0m")
 
         confirm = get_input_with_escape("\n[ENTER] Start splitting\n[ESC] Cancel\n>").strip().lower()
         if confirm == "cancel":
-            print("Restarting...\n")
+            print("\033[97mRestarting...\033[0m\n")
             continue
         elif confirm != "":
-            print("No confirmation received. Exiting.")
+            print("\033[97mNo confirmation received.\033[0m \033[37mExiting.\033[0m")
             sys.exit(0)
         else:
             split_video(input_path, segment_length, export_dir)
-            print("✅ Splitting complete!")
+            print("\033[97m✅ Splitting complete!\033[0m")
             break
