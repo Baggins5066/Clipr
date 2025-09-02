@@ -9,7 +9,7 @@ init()
 def split_video(input_path, segment_length, export_dir="Clips", output_prefix="clip"):
     # Load video
     video = VideoFileClip(input_path)
-    duration = video.duration  # total length in seconds
+    duration = video.duration / 60  # total length in minutes
     
     # Loop through segments
     start = 0
@@ -17,13 +17,14 @@ def split_video(input_path, segment_length, export_dir="Clips", output_prefix="c
     os.makedirs(export_dir, exist_ok=True)
     while start < duration:
         end = min(start + segment_length, duration)
-        clip = video.subclip(start, end)
+        # Convert start and end to minutes for display
+        clip = video.subclip(start * 60, end * 60)
         output_name = os.path.join(export_dir, f"{output_prefix}_{part}.mp4")
-    print(f"Exporting {Fore.BLUE}{output_name} ({start:.0f}s - {end:.0f}s)...{Style.RESET_ALL}")
-    clip_duration = end - start
+        print(f"Exporting {Fore.BLUE}{output_name} ({start:.2f}m - {end:.2f}m)...{Style.RESET_ALL}")
+        clip_duration = end - start
     class TqdmLogger:
         def __init__(self, total):
-            self.pbar = tqdm(total=total, desc=f"Trimming {output_name}", unit="sec")
+            self.pbar = tqdm(total=total, desc=f"Trimming {output_name}", unit="min")
         def __call__(self, **kwargs):
             if 'progress' in kwargs:
                 self.pbar.n = int(kwargs['progress'] * self.pbar.total)
@@ -101,13 +102,13 @@ if __name__ == "__main__":
         except ValueError:
             print("Invalid number for clip length. Try again.")
             continue
-        segment_length = int(seconds)
+        segment_length = seconds / 60  # Convert segment_length from seconds to minutes
         export_dir = preferences.EXPORT_LOCATION
 
         # Gather video info
         try:
             video = VideoFileClip(input_path)
-            duration = video.duration
+            duration = video.duration / 60
         except Exception as e:
             print(f"Error loading video: {e}")
             continue
@@ -115,10 +116,10 @@ if __name__ == "__main__":
         num_clips = int((duration + segment_length - 1) // segment_length)
         est_time = duration  # rough estimate: 1x video duration
         print("\nVideo info:")
-        print(f"- Duration: {duration:.2f} seconds")
-        print(f"- Clip length: {segment_length} seconds")
+        print(f"- Duration: {duration:.2f} minutes")
+        print(f"- Clip length: {segment_length:.2f} minutes")
         print(f"- Number of clips: {num_clips}")
-        print(f"- Estimated processing time: {est_time:.1f} seconds (actual may vary)")
+        print(f"- Estimated processing time: {est_time:.2f} minutes (actual may vary)")
         print(f"- Export directory: {export_dir}")
 
         confirm = get_input_with_escape("\n[ENTER] Start splitting\n[ESC] Cancel\n>").strip().lower()
