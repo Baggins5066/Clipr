@@ -19,7 +19,7 @@ def split_video(input_path, segment_length, export_dir="Clips", output_prefix="c
         end = min(start + segment_length, duration)
         clip = video.subclip(start, end)
         output_name = os.path.join(export_dir, f"{output_prefix}_{part}.mp4")
-    print(f"{Fore.WHITE}Exporting{Style.RESET_ALL} {Fore.LIGHTWHITE_EX}{output_name} ({start:.0f}s - {end:.0f}s)...{Style.RESET_ALL}")
+    print(f"Exporting {Fore.BLUE}{output_name} ({start:.0f}s - {end:.0f}s)...{Style.RESET_ALL}")
     clip_duration = end - start
     class TqdmLogger:
         def __init__(self, total):
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     import msvcrt
 
     def get_input_with_escape(prompt):
-        print(f"{Fore.WHITE}{prompt}{Style.RESET_ALL}", end='', flush=True)
+        print(f"{prompt}", end='', flush=True)
         chars = []
         while True:
             ch = msvcrt.getwch()
@@ -86,7 +86,7 @@ if __name__ == "__main__":
         )
         root.destroy()
         if not file_path:
-            print(f"{Fore.WHITE}No file selected.{Style.RESET_ALL} {Fore.LIGHTWHITE_EX}Exiting.{Style.RESET_ALL}")
+            print("No file selected. Exiting.")
             sys.exit(0)
         return file_path
 
@@ -94,12 +94,12 @@ if __name__ == "__main__":
     while True:
         # Open file picker automatically
         input_path = pick_video_file()
-        print(f"\n{Fore.WHITE}Selected file: {Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
+        print(f"\nSelected file: {Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
         seconds_str = get_input_with_escape("Enter clip length in seconds:\n> ").strip()
         try:
             seconds = float(seconds_str)
         except ValueError:
-            print(f"{Fore.WHITE}Invalid number for clip length.{Style.RESET_ALL} {Fore.LIGHTWHITE_EX}Try again.{Style.RESET_ALL}")
+            print("Invalid number for clip length. Try again.")
             continue
         segment_length = int(seconds)
         export_dir = preferences.EXPORT_LOCATION
@@ -109,26 +109,26 @@ if __name__ == "__main__":
             video = VideoFileClip(input_path)
             duration = video.duration
         except Exception as e:
-            print(f"{Fore.WHITE}Error loading video:{Style.RESET_ALL} {Fore.LIGHTWHITE_EX}{e}{Style.RESET_ALL}")
+            print(f"Error loading video: {e}")
             continue
 
         num_clips = int((duration + segment_length - 1) // segment_length)
         est_time = duration  # rough estimate: 1x video duration
-        print(f"{Fore.WHITE}\nVideo info:")
-        print(f"{Fore.WHITE}- Duration:{Style.RESET_ALL} {Fore.LIGHTWHITE_EX}{duration:.2f} seconds{Style.RESET_ALL}")
-        print(f"{Fore.WHITE}- Clip length:{Style.RESET_ALL} {Fore.LIGHTWHITE_EX}{segment_length} seconds{Style.RESET_ALL}")
-        print(f"{Fore.WHITE}- Number of clips:{Style.RESET_ALL} {Fore.LIGHTWHITE_EX}{num_clips}{Style.RESET_ALL}")
-        print(f"{Fore.WHITE}- Estimated processing time:{Style.RESET_ALL} {Fore.LIGHTWHITE_EX}{est_time:.1f} seconds (actual may vary){Style.RESET_ALL}")
-        print(f"{Fore.WHITE}- Export directory:{Style.RESET_ALL} {Fore.LIGHTWHITE_EX}{export_dir}{Style.RESET_ALL}")
+        print("\nVideo info:")
+        print(f"- Duration: {duration:.2f} seconds")
+        print(f"- Clip length: {segment_length} seconds")
+        print(f"- Number of clips: {num_clips}")
+        print(f"- Estimated processing time: {est_time:.1f} seconds (actual may vary)")
+        print(f"- Export directory: {export_dir}")
 
         confirm = get_input_with_escape("\n[ENTER] Start splitting\n[ESC] Cancel\n>").strip().lower()
         if confirm == "cancel":
-            print(f"{Fore.WHITE}Restarting...{Style.RESET_ALL}\n")
+            print("Restarting...\n")
             continue
         elif confirm != "":
-            print(f"{Fore.WHITE}No confirmation received.{Style.RESET_ALL} {Fore.LIGHTWHITE_EX}Exiting.{Style.RESET_ALL}")
+            print("No confirmation received. Exiting.")
             sys.exit(0)
         else:
             split_video(input_path, segment_length, export_dir)
-            print(f"{Fore.WHITE}✅ Splitting complete!{Style.RESET_ALL}")
+            print("✅ Splitting complete!")
             break
