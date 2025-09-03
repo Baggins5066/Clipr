@@ -1,2 +1,2 @@
 # Export location for clips
-EXPORT_LOCATION = r"."
+EXPORT_LOCATION = r"Exports"
