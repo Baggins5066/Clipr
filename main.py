@@ -116,11 +116,11 @@ if __name__ == "__main__":
         num_clips = int((duration + segment_length - 1) // segment_length)
         est_time = duration  # rough estimate: 1x video duration
         print("\nVideo info:")
-        print(f"- Duration: {duration:.2f} minutes")
-        print(f"- Clip length: {segment_length:.2f} minutes")
-        print(f"- Number of clips: {num_clips}")
-        print(f"- Estimated processing time: {est_time:.2f} minutes (actual may vary)")
-        print(f"- Export directory: {export_dir}")
+        print(f"- Duration: {Style.DIM}{duration:.2f} minutes{Style.RESET_ALL}")
+        print(f"- Clip length: {Style.DIM}{segment_length:.2f} minutes{Style.RESET_ALL}")
+        print(f"- Number of clips: {Style.DIM}{num_clips}{Style.RESET_ALL}")
+        print(f"- Estimated processing time: {Style.DIM}{est_time:.2f} minutes (actual may vary){Style.RESET_ALL}")
+        print(f"- Export directory: {Style.DIM}{export_dir}{Style.RESET_ALL}")
 
         confirm = get_input_with_escape("\n[ENTER] Start splitting\n[ESC] Cancel\n>").strip().lower()
         if confirm == "cancel":
