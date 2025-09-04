@@ -1,169 +1,158 @@
-# Clipr: An app that takes a video and converts it to clips of equal length
-from moviepy.editor import VideoFileClip
+# Clipr (Optimized MoviePy Version)
 import os
-from tqdm import tqdm
+import sys
+import msvcrt
+import tkinter as tk
+from tkinter import filedialog
+from moviepy.editor import VideoFileClip
 from colorama import init, Fore, Style
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
 
 init()
 
+# -------------------- Splitting -------------------- #
+def export_clip(input_path, start, end, output_name):
+    video = VideoFileClip(input_path).subclip(start, end)
+    video.write_videofile(
+        output_name,
+        codec="libx264",
+        audio_codec="aac",
+        preset="ultrafast",
+        threads=os.cpu_count(),
+        verbose=False,
+        logger=None
+    )
+    video.close()
+    return output_name
+
+
 def split_video(input_path, segment_length, export_dir="Clips", output_prefix="clip"):
-    # Load video
+    os.makedirs(export_dir, exist_ok=True)
+
     video = VideoFileClip(input_path)
-    duration = video.duration / 60  # total length in minutes
-    
-    # Loop through segments
+    duration = video.duration
+    video.close()
+
     start = 0
     part = 1
-    os.makedirs(export_dir, exist_ok=True)
-    while start < duration:
-        end = min(start + segment_length, duration)
-        # Convert start and end to minutes for display
-        clip = video.subclip(start * 60, end * 60)
-        output_name = os.path.join(export_dir, f"{output_prefix}_{part}.mp4")
-        print(f"Exporting {Fore.BLUE}{output_name} ({start:.2f}m - {end:.2f}m)...{Style.RESET_ALL}")
-        clip_duration = end - start
-    class TqdmLogger:
-        def __init__(self, total):
-            self.pbar = tqdm(total=total, desc=f"Trimming {output_name}", unit="min")
-        def __call__(self, **kwargs):
-            if 'progress' in kwargs:
-                self.pbar.n = int(kwargs['progress'] * self.pbar.total)
-                self.pbar.refresh()
-            if kwargs.get('progress') == 1:
-                    self.pbar.n = self.pbar.total
-                    self.pbar.refresh()
-                    self.pbar.close()
-        def iter_bar(self, **kwargs):
-            # MoviePy passes the iterable as a keyword argument, e.g. t=...
-            iterable = None
-            if 'chunk' in kwargs:
-                iterable = kwargs['chunk']
-            elif 't' in kwargs:
-                iterable = kwargs['t']
-            else:
-                # fallback: get the first value
-                iterable = next(iter(kwargs.values()))
-            for i in iterable:
-                self.pbar.update(1)
-                yield i
-            self.pbar.close()
-            logger = TqdmLogger(int(clip_duration))
-            clip.write_videofile(output_name, codec="libx264", audio_codec="aac", verbose=False, logger=logger)
+    jobs = []
+    with ProcessPoolExecutor(max_workers=max(1, multiprocessing.cpu_count() // 2)) as executor:
+        while start < duration:
+            end = min(start + segment_length, duration)
+            output_name = os.path.join(export_dir, f"{output_prefix}_{part}.mp4")
+            print(f"Queued {Fore.BLUE}{output_name} ({start:.1f}s - {end:.1f}s){Style.RESET_ALL}")
+            jobs.append(executor.submit(export_clip, input_path, start, end, output_name))
             start += segment_length
             part += 1
 
-if __name__ == "__main__":
-    import sys
-    import msvcrt
+        for job in jobs:
+            job.result()  # Wait for all exports
 
-    def get_input_with_escape(prompt):
-        print(f"{prompt}", end='', flush=True)
-        chars = []
-        while True:
-            ch = msvcrt.getwch()
-            if ch == '\r' or ch == '\n':
-                print()
-                return ''.join(chars)
-            elif ch == '\x1b':  # ESC key
-                print("\nESC pressed. Exited program.")
-                sys.exit(0)
-            elif ch == '\x08':  # Backspace
-                if chars:
-                    chars.pop()
-                    print('\b \b', end='', flush=True)
-            else:
-                chars.append(ch)
-                print(ch, end='', flush=True)
+    print("\n✅ Splitting complete!\n")
 
-    import tkinter as tk
-    from tkinter import filedialog
 
-    def pick_video_file():
-        root = tk.Tk()
-        root.withdraw()
-        file_path = filedialog.askopenfilename(
-            title="Select video file",
-            filetypes=[("Video files", "*.mp4;*.avi;*.mov;*.mkv;*.flv;*.wmv"), ("All files", "*.*")]
-        )
-        root.destroy()
-        if not file_path:
-            print("No file selected. Exiting.")
-            sys.exit(0)
-        return file_path
-
-    import preferences
+# -------------------- Input Helpers -------------------- #
+def get_input_with_escape(prompt):
+    print(f"{prompt}", end='', flush=True)
+    chars = []
     while True:
-        # Open file picker automatically
+        ch = msvcrt.getwch()
+        if ch == '\r' or ch == '\n':
+            print()
+            return ''.join(chars)
+        elif ch == '\x1b':  # ESC key
+            print("\nESC pressed. Exited program.")
+            sys.exit(0)
+        elif ch == '\x08':  # Backspace
+            if chars:
+                chars.pop()
+                print('\b \b', end='', flush=True)
+        else:
+            chars.append(ch)
+            print(ch, end='', flush=True)
+
+
+def pick_video_file():
+    root = tk.Tk()
+    root.withdraw()
+    file_path = filedialog.askopenfilename(
+        title="Select video file",
+        filetypes=[("Video files", "*.mp4;*.avi;*.mov;*.mkv;*.flv;*.wmv"),
+                   ("All files", "*.*")]
+    )
+    root.destroy()
+    if not file_path:
+        print("No file selected. Exiting.")
+        sys.exit(0)
+    return file_path
+
+
+# -------------------- Main -------------------- #
+if __name__ == "__main__":
+    import time
+
+    while True:
         input_path = pick_video_file()
         print(f"\nSelected file: {Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
+
         seconds_str = get_input_with_escape("Enter clip length in seconds:\n> ").strip()
         try:
-            seconds = float(seconds_str)
+            segment_length = float(seconds_str)
         except ValueError:
             print("Invalid number for clip length. Try again.")
             continue
-        segment_length = seconds / 60  # Convert segment_length from seconds to minutes
-        export_dir = preferences.EXPORT_LOCATION
 
-        # Gather video info
-        try:
-            video = VideoFileClip(input_path)
-            duration = video.duration / 60
-        except Exception as e:
-            print(f"Error loading video: {e}")
-            continue
+        export_dir = "Clips"
+
+        # Get video duration
+        video = VideoFileClip(input_path)
+        duration = video.duration
+        video.close()
 
         num_clips = int((duration + segment_length - 1) // segment_length)
 
-        # Estimate processing time by timing the first clip export
+        # --- Estimate processing time --- #
+        print("\nEstimating processing time...")
 
-        # --- Timer utilities ---
-        import time
-        import threading
-
-        def start_elapsed_timer(label):
-            stop_event = threading.Event()
-            def timer():
-                start_time = time.time()
-                while not stop_event.is_set():
-                    elapsed = int(time.time() - start_time)
-                    print(f"\r{label}... ({elapsed // 60}:{elapsed % 60:02d})", end='', flush=True)
-                    time.sleep(1)
-                print("\r", end='', flush=True)
-            t = threading.Thread(target=timer)
-            t.daemon = True
-            t.start()
-            return stop_event
-
-        # --- Estimation with timer ---
-        first_clip_start = 0
-        first_clip_end = min(segment_length, duration)
-        first_clip = video.subclip(first_clip_start * 60, first_clip_end * 60)
+        first_clip = VideoFileClip(input_path).subclip(0, min(segment_length, duration))
         temp_output = os.path.join(export_dir, "__temp_estimate__.mp4")
-        est_timer_stop = start_elapsed_timer("Estimating processing time")
+        os.makedirs(export_dir, exist_ok=True)
+
         t0 = time.time()
         try:
-            first_clip.write_videofile(temp_output, codec="libx264", audio_codec="aac", verbose=False, logger=None)
+            first_clip.write_videofile(
+                temp_output,
+                codec="libx264",
+                audio_codec="aac",
+                preset="ultrafast",
+                threads=os.cpu_count(),
+                verbose=False,
+                logger=None
+            )
         except Exception as e:
-            print(f"Error during estimation: {e}")
-            est_time = duration
+            print(f"{Fore.RED}Estimation failed: {e}{Style.RESET_ALL}")
+            est_time = duration / 60
         else:
             t1 = time.time()
             est_time = (t1 - t0) * num_clips / 60  # in minutes
         finally:
-            est_timer_stop.set()
-            print()
+            first_clip.close()
             if os.path.exists(temp_output):
                 os.remove(temp_output)
 
         print("\nVideo info:")
-        print(f"{Style.DIM}- Duration: {Style.RESET_ALL}{duration:.2f} minutes")
-        print(f"{Style.DIM}- Clip length: {Style.RESET_ALL}{segment_length:.2f} minutes")
+        print(f"{Style.DIM}- Duration: {Style.RESET_ALL}{duration/60:.2f} minutes")
+        print(f"{Style.DIM}- Clip length: {Style.RESET_ALL}{segment_length/60:.2f} minutes")
         print(f"{Style.DIM}- Number of clips: {Style.RESET_ALL}{num_clips}")
         print(f"{Style.DIM}- Estimated processing time: {Style.RESET_ALL}~{est_time:.2f} minutes")
         print(f"{Style.DIM}- Export directory: {Style.RESET_ALL}{export_dir}")
 
-        confirm = get_input_with_escape(f"{Fore.BLUE}{Style.BRIGHT}\n[ENTER]{Style.NORMAL} Start processing{Style.BRIGHT}\n[ESC]{Style.NORMAL} Cancel\n>{Style.RESET_ALL}").strip()
+        confirm = get_input_with_escape(
+            f"{Fore.BLUE}{Style.BRIGHT}\n[ENTER]{Style.NORMAL} Start processing"
+            f"\n[ESC]{Style.NORMAL} Cancel\n>{Style.RESET_ALL}"
+        ).strip()
+
         if confirm == "cancel":
             print("Restarting...\n")
             continue
@@ -171,9 +160,5 @@ if __name__ == "__main__":
             print("No confirmation received. Exiting.")
             sys.exit(0)
         else:
-            # Show timer during processing
-            proc_timer_stop = start_elapsed_timer("Processing")
             split_video(input_path, segment_length, export_dir)
-            proc_timer_stop.set()
-            print("\n✅ Splitting complete!")
             break
