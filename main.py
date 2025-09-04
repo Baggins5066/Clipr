@@ -127,7 +127,7 @@ if __name__ == "__main__":
                 start_time = time.time()
                 while not stop_event.is_set():
                     elapsed = int(time.time() - start_time)
-                    print(f"\r{label} Elapsed: {elapsed // 60:02d}:{elapsed % 60:02d}", end='', flush=True)
+                    print(f"\r{label}... ({elapsed // 60}:{elapsed % 60:02d})", end='', flush=True)
                     time.sleep(1)
                 print("\r", end='', flush=True)
             t = threading.Thread(target=timer)
@@ -140,8 +140,7 @@ if __name__ == "__main__":
         first_clip_end = min(segment_length, duration)
         first_clip = video.subclip(first_clip_start * 60, first_clip_end * 60)
         temp_output = os.path.join(export_dir, "__temp_estimate__.mp4")
-        print(f"\nEstimating processing time...")
-        est_timer_stop = start_elapsed_timer("Estimating")
+        est_timer_stop = start_elapsed_timer("Estimating processing time")
         t0 = time.time()
         try:
             first_clip.write_videofile(temp_output, codec="libx264", audio_codec="aac", verbose=False, logger=None)
