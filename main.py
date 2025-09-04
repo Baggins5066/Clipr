@@ -122,7 +122,7 @@ if __name__ == "__main__":
         print(f"{Style.DIM}- Estimated processing time: {Style.RESET_ALL}~{est_time:.2f} minutes")
         print(f"{Style.DIM}- Export directory: {Style.RESET_ALL}{export_dir}")
 
-        confirm = get_input_with_escape("\n[ENTER] Start splitting\n[ESC] Cancel\n>").strip().lower()
+        confirm = get_input_with_escape(f"{Fore.BLUE}{Style.BRIGHT}\n[ENTER]{Style.NORMAL} Start processing{Style.BRIGHT}\n[ESC]{Style.NORMAL} Cancel\n>{Style.RESET_ALL}").strip()
         if confirm == "cancel":
             print("Restarting...\n")
             continue
