@@ -114,7 +114,27 @@ if __name__ == "__main__":
             continue
 
         num_clips = int((duration + segment_length - 1) // segment_length)
-        est_time = duration  # rough estimate: 1x video duration
+
+        # Estimate processing time by timing the first clip export
+        import time
+        first_clip_start = 0
+        first_clip_end = min(segment_length, duration)
+        first_clip = video.subclip(first_clip_start * 60, first_clip_end * 60)
+        temp_output = os.path.join(export_dir, "__temp_estimate__.mp4")
+        print(f"\nEstimating processing time...")
+        t0 = time.time()
+        try:
+            first_clip.write_videofile(temp_output, codec="libx264", audio_codec="aac", verbose=False, logger=None)
+        except Exception as e:
+            print(f"Error during estimation: {e}")
+            est_time = duration
+        else:
+            t1 = time.time()
+            est_time = (t1 - t0) * num_clips / 60  # in minutes
+        finally:
+            if os.path.exists(temp_output):
+                os.remove(temp_output)
+
         print("\nVideo info:")
         print(f"{Style.DIM}- Duration: {Style.RESET_ALL}{duration:.2f} minutes")
         print(f"{Style.DIM}- Clip length: {Style.RESET_ALL}{segment_length:.2f} minutes")
