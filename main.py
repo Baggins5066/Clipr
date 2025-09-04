@@ -116,12 +116,32 @@ if __name__ == "__main__":
         num_clips = int((duration + segment_length - 1) // segment_length)
 
         # Estimate processing time by timing the first clip export
+
+        # --- Timer utilities ---
         import time
+        import threading
+
+        def start_elapsed_timer(label):
+            stop_event = threading.Event()
+            def timer():
+                start_time = time.time()
+                while not stop_event.is_set():
+                    elapsed = int(time.time() - start_time)
+                    print(f"\r{label} Elapsed: {elapsed // 60:02d}:{elapsed % 60:02d}", end='', flush=True)
+                    time.sleep(1)
+                print("\r", end='', flush=True)
+            t = threading.Thread(target=timer)
+            t.daemon = True
+            t.start()
+            return stop_event
+
+        # --- Estimation with timer ---
         first_clip_start = 0
         first_clip_end = min(segment_length, duration)
         first_clip = video.subclip(first_clip_start * 60, first_clip_end * 60)
         temp_output = os.path.join(export_dir, "__temp_estimate__.mp4")
         print(f"\nEstimating processing time...")
+        est_timer_stop = start_elapsed_timer("Estimating")
         t0 = time.time()
         try:
             first_clip.write_videofile(temp_output, codec="libx264", audio_codec="aac", verbose=False, logger=None)
@@ -132,6 +152,8 @@ if __name__ == "__main__":
             t1 = time.time()
             est_time = (t1 - t0) * num_clips / 60  # in minutes
         finally:
+            est_timer_stop.set()
+            print()
             if os.path.exists(temp_output):
                 os.remove(temp_output)
 
@@ -150,6 +172,9 @@ if __name__ == "__main__":
             print("No confirmation received. Exiting.")
             sys.exit(0)
         else:
+            # Show timer during processing
+            proc_timer_stop = start_elapsed_timer("Processing")
             split_video(input_path, segment_length, export_dir)
-            print("✅ Splitting complete!")
+            proc_timer_stop.set()
+            print("\n✅ Splitting complete!")
             break
