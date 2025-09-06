@@ -160,4 +160,13 @@ if __name__ == "__main__":
         print(f"{Style.DIM}- Number of clips: {Style.RESET_ALL}{num_clips}")
         print(f"{Style.DIM}- Estimated total output size: {Style.RESET_ALL}{est_size/1e6:.2f} MB")
 
+    # Add a confirmation step before starting the process
+    confirm_prompt = (
+        f"\n{Fore.BLUE}{Style.BRIGHT}Finalizing selections...{Style.RESET_ALL}\n\n"
+        f"Clip length: {Fore.CYAN}{segment_length} seconds{Style.RESET_ALL}\n"
+        f"Crop: {Fore.CYAN}{'Yes' if crop_vertical else 'No'}{Style.RESET_ALL}\n\n"
+        f"Press {Fore.GREEN}[ENTER]{Style.RESET_ALL} to start processing clips..."
+    )
+    get_input_with_escape(confirm_prompt)
+
     split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, crop_vertical=crop_vertical)
