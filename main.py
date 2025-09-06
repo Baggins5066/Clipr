@@ -134,14 +134,15 @@ if __name__ == "__main__":
     input_path = pick_video_file()
     print(f"\nSelected file: {Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
 
-    seconds_str = get_input_with_escape("Enter clip length in seconds:\n> ").strip()
+    seconds_str = get_input_with_escape(f"Enter clip length in seconds:\n> {Fore.BLUE}").strip()
+    print(Style.RESET_ALL, end='')  # Reset color after input
     try:
         segment_length = int(seconds_str)
     except ValueError:
         print("Invalid number for clip length. Exiting.")
         sys.exit(0)
 
-    crop_choice = get_input_with_escape("Crop to Shorts vertical format? Cropping requires re-encoding; output size may differ.\n[1] Yes\n[2] No\n> ").strip().lower()
+    crop_choice = get_input_with_escape(f"Crop to Shorts vertical format? {Style.DIM}Cropping requires re-encoding; output size may differ.\n{Style.BRIGHT}{Fore.GREEN}[1] {Style.NORMAL}Yes\n{Style.BRIGHT}{Fore.GREEN}[2] {Style.NORMAL}No\n{Style.RESET_ALL}> ").strip().lower()
     crop_vertical = crop_choice == "1"
     
     # --- Preview Info --- #
