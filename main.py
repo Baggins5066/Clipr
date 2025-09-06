@@ -61,50 +61,49 @@ def get_video_info(input_path):
 def split_video_ffmpeg(input_path, segment_length, export_dir="Clips", crop_vertical=False):
     os.makedirs(export_dir, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(input_path))[0]
-    
-    # Get total video duration to calculate timestamps
     duration, _ = get_video_info(input_path)
+
     if duration == 0:
-        print(f"{Fore.YELLOW}Warning: Could not get video duration. Filenames will not include timestamps.{Style.RESET_ALL}")
-        
-    # Step 1: Split into equal chunks (super fast, no re-encode)
-    split_pattern = os.path.join(export_dir, f"{base_name}_%03d.mp4")
-    split_cmd = [
-        "ffmpeg", "-i", input_path,
-        "-c", "copy", "-map", "0",
-        "-f", "segment", "-segment_time", str(segment_length),
-        split_pattern
-    ]
-    print(f"{Fore.BLUE}Splitting video...{Style.RESET_ALL}")
-    subprocess.run(split_cmd, check=True)
+        print(f"{Fore.YELLOW}Warning: Could not get video duration. Cannot proceed with splitting.{Style.RESET_ALL}")
+        return
 
-    # Step 2: Rename files with timestamps and optionally crop
-    print(f"{Fore.BLUE}Renaming clips with timestamps...{Style.RESET_ALL}")
+    print(f"{Fore.BLUE}Processing clips...{Style.RESET_ALL}")
     
-    # Calculate initial timestamps
-    for i, file in enumerate(sorted(os.listdir(export_dir))):
-        if file.startswith(f"{base_name}_") and file.endswith(".mp4"):
-            start_time = i * segment_length
-            end_time = min(start_time + segment_length, duration)
-            start_time_str = f"{int(start_time):02d}"
-            end_time_str = f"{int(end_time):02d}"
+    start_time = 0
+    clip_count = 0
+    while start_time < duration:
+        clip_count += 1
+        end_time = min(start_time + segment_length, duration)
+        
+        start_time_str = f"{int(start_time):02d}"
+        end_time_str = f"{int(end_time):02d}"
+        
+        new_filename = f"{base_name}_{start_time_str}-{end_time_str}.mp4"
+        out_path = os.path.join(export_dir, new_filename)
 
-            in_path = os.path.join(export_dir, file)
-            new_filename = f"{base_name}_{start_time_str}-{end_time_str}.mp4"
-            out_path = os.path.join(export_dir, new_filename)
-            
-            # If cropping, re-encode and rename.
-            if crop_vertical:
-                print(f"{Fore.BLUE}Cropping and re-encoding '{new_filename}'...{Style.RESET_ALL}")
-                crop_cmd = [
-                    "ffmpeg", "-i", in_path,
-                    "-vf", "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=1080:1920",
-                    "-c:a", "aac", out_path
-                ]
-                subprocess.run(crop_cmd, check=True)
-                os.remove(in_path) # Clean up original split file
-            else:
-                os.rename(in_path, out_path)
+        # Base FFmpeg command
+        cmd = [
+            "ffmpeg",
+            "-ss", str(start_time),
+            "-i", input_path,
+            "-t", str(segment_length),
+            "-c:v", "libx264", "-c:a", "aac",
+            "-crf", "23", "-preset", "medium",
+            out_path
+        ]
+        
+        # Add cropping filter if needed
+        if crop_vertical:
+            cmd.insert(-1, "-vf")
+            cmd.insert(-1, "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=1080:1920")
+
+        try:
+            subprocess.run(cmd, check=True)
+            print(f"✅ Created clip: {new_filename}")
+        except subprocess.CalledProcessError as e:
+            print(f"{Fore.RED}Error processing clip {new_filename}: {e}{Style.RESET_ALL}")
+        
+        start_time += segment_length
 
     print("\n✅ Processing complete!\n")
 
