@@ -58,7 +58,7 @@ def get_video_info(input_path):
         return 0, 0
 
 # -------------------- Splitting -------------------- #
-def split_video_ffmpeg(input_path, segment_length, export_dir="Clips", crop_vertical=False):
+def split_video_ffmpeg(input_path, segment_length, gpu_choice, export_dir="Clips", crop_vertical=False):
     os.makedirs(export_dir, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(input_path))[0]
     duration, _ = get_video_info(input_path)
@@ -68,6 +68,17 @@ def split_video_ffmpeg(input_path, segment_length, export_dir="Clips", crop_vert
         return
 
     print(f"{Fore.BLUE}Processing clips...{Style.RESET_ALL}")
+
+    # Map user choice to the correct FFmpeg video codec
+    if gpu_choice == '1':
+        video_codec = "h264_nvenc"
+    elif gpu_choice == '2':
+        video_codec = "h264_qsv"
+    elif gpu_choice == '3':
+        video_codec = "h264_amf"
+    else:
+        video_codec = "libx264"
+        print(f"{Fore.YELLOW}No valid GPU choice selected. Reverting to CPU encoding.{Style.RESET_ALL}")
     
     start_time = 0
     clip_count = 0
@@ -81,13 +92,14 @@ def split_video_ffmpeg(input_path, segment_length, export_dir="Clips", crop_vert
         new_filename = f"{base_name}_{start_time_str}-{end_time_str}.mp4"
         out_path = os.path.join(export_dir, new_filename)
 
-        # Base FFmpeg command
+        # Base FFmpeg command with GPU acceleration
         cmd = [
             "ffmpeg",
             "-ss", str(start_time),
             "-i", input_path,
             "-t", str(segment_length),
-            "-c:v", "libx264", "-c:a", "aac",
+            "-c:v", video_codec,
+            "-c:a", "aac",
             "-crf", "23", "-preset", "medium",
             out_path
         ]
@@ -121,6 +133,8 @@ if __name__ == "__main__":
 
     crop_choice = get_input_with_escape("Crop to Shorts vertical format? (y/n):\n> ").strip().lower()
     crop_vertical = crop_choice == "y"
+    
+    gpu_choice = get_input_with_escape("Choose your GPU vendor for acceleration:\n[1] NVIDIA\n[2] Intel\n[3] AMD\n> ").strip()
 
     # --- Preview Info --- #
     duration, size = get_video_info(input_path)
@@ -147,4 +161,4 @@ if __name__ == "__main__":
         print("No confirmation received. Exiting.")
         sys.exit(0)
     else:
-        split_video_ffmpeg(input_path, segment_length, crop_vertical=crop_vertical)
+        split_video_ffmpeg(input_path, segment_length, gpu_choice, crop_vertical=crop_vertical)
