@@ -117,7 +117,7 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         # Add cropping filter if needed
         if crop_vertical:
             cmd.insert(-1, "-vf")
-            cmd.insert(-1, "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=1080:1920")
+            cmd.insert(-1, "crop=ih*9/16:ih:(iw-ih*9/16)/2:0")
 
         try:
             subprocess.run(cmd, check=True)
@@ -141,7 +141,7 @@ if __name__ == "__main__":
         print("Invalid number for clip length. Exiting.")
         sys.exit(0)
 
-    crop_choice = get_input_with_escape("Crop to Shorts vertical format?\n[1] Yes\n[2] No\n> ").strip().lower()
+    crop_choice = get_input_with_escape("Crop to Shorts vertical format? Cropping requires re-encoding; output size may differ.\n[1] Yes\n[2] No\n> ").strip().lower()
     crop_vertical = crop_choice == "1"
     
     # --- Preview Info --- #
@@ -151,9 +151,6 @@ if __name__ == "__main__":
     else:
         num_clips = int((duration + segment_length - 1) // segment_length)
         est_size = size  # splitting copies streams → size ≈ same as input
-        if crop_vertical:
-            print(f"\n{Fore.YELLOW}Note: Cropping requires re-encoding, output size may differ significantly.{Style.RESET_ALL}")
-
         print("\nVideo info:")
         print(f"{Style.DIM}- Duration: {Style.RESET_ALL}{duration/60:.2f} minutes")
         print(f"{Style.DIM}- Clip length: {Style.RESET_ALL}{segment_length/60:.2f} minutes")
