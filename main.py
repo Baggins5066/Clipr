@@ -58,7 +58,7 @@ def get_video_info(input_path):
         return 0, 0
 
 # -------------------- Splitting -------------------- #
-def split_video_ffmpeg(input_path, segment_length, gpu_choice, quality_choice, export_dir="Clips", crop_vertical=False):
+def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, export_dir="Clips", crop_vertical=False):
     os.makedirs(export_dir, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(input_path))[0]
     duration, _ = get_video_info(input_path)
@@ -69,27 +69,22 @@ def split_video_ffmpeg(input_path, segment_length, gpu_choice, quality_choice, e
 
     print(f"{Fore.BLUE}Processing clips...{Style.RESET_ALL}")
 
-    # Map user choice to the correct FFmpeg video codec
-    if gpu_choice == '1':
-        video_codec = "h264_nvenc"
-    elif gpu_choice == '2':
-        video_codec = "h264_qsv"
-    elif gpu_choice == '3':
-        video_codec = "h264_amf"
-    else:
+    if encoder_type == '1': # CPU Encoding
         video_codec = "libx264"
-        print(f"{Fore.YELLOW}No valid GPU choice selected. Reverting to CPU encoding.{Style.RESET_ALL}")
-    
-    # Map user choice to the correct FFmpeg quality/bitrate settings
-    if quality_choice == '1':
-        # Lower quality, smaller file size
-        crf = "28"
-    elif quality_choice == '3':
-        # Higher quality, larger file size
         crf = "18"
-    else:
-        # Default medium quality
+        print(f"{Fore.CYAN}Using CPU encoding for high quality. This may take longer.{Style.RESET_ALL}")
+    else: # GPU Encoding
+        if gpu_brand == '1':
+            video_codec = "h264_nvenc"
+        elif gpu_brand == '2':
+            video_codec = "h264_qsv"
+        elif gpu_brand == '3':
+            video_codec = "h264_amf"
+        else:
+            video_codec = "libx264"
+            print(f"{Fore.YELLOW}No valid GPU brand selected. Reverting to CPU encoding.{Style.RESET_ALL}")
         crf = "23"
+        print(f"{Fore.CYAN}Using GPU encoding for speed. Quality may vary.{Style.RESET_ALL}")
 
     start_time = 0
     clip_count = 0
@@ -103,7 +98,7 @@ def split_video_ffmpeg(input_path, segment_length, gpu_choice, quality_choice, e
         new_filename = f"{base_name}_{start_time_str}-{end_time_str}.mp4"
         out_path = os.path.join(export_dir, new_filename)
 
-        # Base FFmpeg command with GPU acceleration
+        # Base FFmpeg command with acceleration
         cmd = [
             "ffmpeg",
             "-ss", str(start_time),
@@ -146,9 +141,11 @@ if __name__ == "__main__":
     crop_choice = get_input_with_escape("Crop to Shorts vertical format? (y/n):\n> ").strip().lower()
     crop_vertical = crop_choice == "y"
     
-    gpu_choice = get_input_with_escape("Choose your GPU vendor for acceleration:\n[1] NVIDIA\n[2] Intel\n[3] AMD\n> ").strip()
-    
-    quality_choice = get_input_with_escape("Choose video quality:\n[1] Low (smaller file size)\n[2] Medium (good balance)\n[3] High (larger file size)\n> ").strip()
+    encoder_choice = get_input_with_escape("Choose encoding type:\n[1] High quality (CPU)\n[2] GPU encoding\n> ").strip()
+
+    gpu_brand = None
+    if encoder_choice == '2':
+        gpu_brand = get_input_with_escape("Choose your GPU brand:\n[1] NVIDIA\n[2] Intel\n[3] AMD\n> ").strip()
 
     # --- Preview Info --- #
     duration, size = get_video_info(input_path)
@@ -166,4 +163,4 @@ if __name__ == "__main__":
         print(f"{Style.DIM}- Number of clips: {Style.RESET_ALL}{num_clips}")
         print(f"{Style.DIM}- Estimated total output size: {Style.RESET_ALL}{est_size/1e6:.2f} MB")
 
-    split_video_ffmpeg(input_path, segment_length, gpu_choice, quality_choice, crop_vertical=crop_vertical)
+    split_video_ffmpeg(input_path, segment_length, encoder_choice, gpu_brand, crop_vertical=crop_vertical)
