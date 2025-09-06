@@ -101,6 +101,11 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         new_filename = f"{base_name}_{start_time_str}-{end_time_str}.mp4"
         out_path = os.path.join(export_dir, new_filename)
 
+        if os.path.exists(out_path):
+            print(f"Skipping existing clip: {new_filename}")
+            start_time += segment_length
+            continue
+
         # Base FFmpeg command with acceleration
         cmd = [
             "ffmpeg",
