@@ -1,4 +1,3 @@
-# Clipr (FFmpeg version with preview)
 import os
 import sys
 import msvcrt
@@ -18,6 +17,9 @@ def get_input_with_escape(prompt):
         ch = msvcrt.getwch()
         if ch == '\r' or ch == '\n':
             print()
+            # Clear the input buffer to prevent it from affecting the next prompt
+            while msvcrt.kbhit():
+                msvcrt.getch()
             return ''.join(chars)
         elif ch == '\x1b':  # ESC key
             print("\nESC pressed. Exited program.")
@@ -139,8 +141,8 @@ if __name__ == "__main__":
         print("Invalid number for clip length. Exiting.")
         sys.exit(0)
 
-    crop_choice = get_input_with_escape("Crop to Shorts vertical format? (y/n):\n> ").strip().lower()
-    crop_vertical = crop_choice == "y"
+    crop_choice = get_input_with_escape("Crop to Shorts vertical format?\n[1] Yes\n[2] No\n> ").strip().lower()
+    crop_vertical = crop_choice == "1"
     
     # --- Preview Info --- #
     duration, size = get_video_info(input_path)
