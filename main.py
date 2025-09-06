@@ -112,6 +112,7 @@ def split_video_ffmpeg(input_path, segment_length, gpu_choice, quality_choice, e
             "-c:v", video_codec,
             "-c:a", "aac",
             "-crf", crf, "-preset", "medium",
+            "-y", # Overwrite output files without asking
             out_path
         ]
         
@@ -165,13 +166,4 @@ if __name__ == "__main__":
         print(f"{Style.DIM}- Number of clips: {Style.RESET_ALL}{num_clips}")
         print(f"{Style.DIM}- Estimated total output size: {Style.RESET_ALL}{est_size/1e6:.2f} MB")
 
-    confirm = get_input_with_escape(
-        f"{Fore.BLUE}{Style.BRIGHT}\n[ENTER]{Style.NORMAL} Start processing"
-        f"\n[ESC]{Style.NORMAL} Cancel\n>{Style.RESET_ALL}"
-    ).strip()
-
-    if confirm != "":
-        print("No confirmation received. Exiting.")
-        sys.exit(0)
-    else:
-        split_video_ffmpeg(input_path, segment_length, gpu_choice, quality_choice, crop_vertical=crop_vertical)
+    split_video_ffmpeg(input_path, segment_length, gpu_choice, quality_choice, crop_vertical=crop_vertical)
