@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import filedialog
 import subprocess
 from colorama import init, Fore, Style
+import preferences
 
 init()
 
@@ -141,12 +142,6 @@ if __name__ == "__main__":
     crop_choice = get_input_with_escape("Crop to Shorts vertical format? (y/n):\n> ").strip().lower()
     crop_vertical = crop_choice == "y"
     
-    encoder_choice = get_input_with_escape("Choose encoding type:\n[1] High quality (CPU)\n[2] GPU encoding\n> ").strip()
-
-    gpu_brand = None
-    if encoder_choice == '2':
-        gpu_brand = get_input_with_escape("Choose your GPU brand:\n[1] NVIDIA\n[2] Intel\n[3] AMD\n> ").strip()
-
     # --- Preview Info --- #
     duration, size = get_video_info(input_path)
     if duration == 0:
@@ -163,4 +158,4 @@ if __name__ == "__main__":
         print(f"{Style.DIM}- Number of clips: {Style.RESET_ALL}{num_clips}")
         print(f"{Style.DIM}- Estimated total output size: {Style.RESET_ALL}{est_size/1e6:.2f} MB")
 
-    split_video_ffmpeg(input_path, segment_length, encoder_choice, gpu_brand, crop_vertical=crop_vertical)
+    split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, crop_vertical=crop_vertical)
