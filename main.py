@@ -142,7 +142,10 @@ if __name__ == "__main__":
         print("Invalid number for clip length. Exiting.")
         sys.exit(0)
 
-    crop_choice = get_input_with_escape(f"Crop to Shorts vertical format? {Style.DIM}Cropping requires re-encoding; output size may differ.\n{Style.BRIGHT}{Fore.GREEN}[1] {Style.NORMAL}Yes\n{Style.BRIGHT}{Fore.GREEN}[2] {Style.NORMAL}No\n{Style.RESET_ALL}> ").strip().lower()
+    print(f"Crop to Shorts vertical format? {Style.DIM}Cropping requires re-encoding; output size may differ.{Style.RESET_ALL}")
+    print(f"{Style.BRIGHT}{Fore.GREEN}[1] {Style.NORMAL}Yes")
+    print(f"{Style.BRIGHT}{Fore.RED}[2] {Style.NORMAL}No")
+    crop_choice = get_input_with_escape(f"{Style.RESET_ALL}> ").strip().lower()
     crop_vertical = crop_choice == "1"
     
     # --- Preview Info --- #
