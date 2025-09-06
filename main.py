@@ -58,7 +58,7 @@ def get_video_info(input_path):
         return 0, 0
 
 # -------------------- Splitting -------------------- #
-def split_video_ffmpeg(input_path, segment_length, gpu_choice, export_dir="Clips", crop_vertical=False):
+def split_video_ffmpeg(input_path, segment_length, gpu_choice, quality_choice, export_dir="Clips", crop_vertical=False):
     os.makedirs(export_dir, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(input_path))[0]
     duration, _ = get_video_info(input_path)
@@ -80,6 +80,17 @@ def split_video_ffmpeg(input_path, segment_length, gpu_choice, export_dir="Clips
         video_codec = "libx264"
         print(f"{Fore.YELLOW}No valid GPU choice selected. Reverting to CPU encoding.{Style.RESET_ALL}")
     
+    # Map user choice to the correct FFmpeg quality/bitrate settings
+    if quality_choice == '1':
+        # Lower quality, smaller file size
+        crf = "28"
+    elif quality_choice == '3':
+        # Higher quality, larger file size
+        crf = "18"
+    else:
+        # Default medium quality
+        crf = "23"
+
     start_time = 0
     clip_count = 0
     while start_time < duration:
@@ -100,7 +111,7 @@ def split_video_ffmpeg(input_path, segment_length, gpu_choice, export_dir="Clips
             "-t", str(segment_length),
             "-c:v", video_codec,
             "-c:a", "aac",
-            "-crf", "23", "-preset", "medium",
+            "-crf", crf, "-preset", "medium",
             out_path
         ]
         
@@ -135,6 +146,8 @@ if __name__ == "__main__":
     crop_vertical = crop_choice == "y"
     
     gpu_choice = get_input_with_escape("Choose your GPU vendor for acceleration:\n[1] NVIDIA\n[2] Intel\n[3] AMD\n> ").strip()
+    
+    quality_choice = get_input_with_escape("Choose video quality:\n[1] Low (smaller file size)\n[2] Medium (good balance)\n[3] High (larger file size)\n> ").strip()
 
     # --- Preview Info --- #
     duration, size = get_video_info(input_path)
@@ -161,4 +174,4 @@ if __name__ == "__main__":
         print("No confirmation received. Exiting.")
         sys.exit(0)
     else:
-        split_video_ffmpeg(input_path, segment_length, gpu_choice, crop_vertical=crop_vertical)
+        split_video_ffmpeg(input_path, segment_length, gpu_choice, quality_choice, crop_vertical=crop_vertical)
