@@ -1,6 +1,7 @@
 *
 !.gitignore
 !README.md
+!Clips/
 !main.py
 !preferences.py
 !requirements.txt
