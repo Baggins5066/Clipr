@@ -70,12 +70,12 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         print(f"{Fore.YELLOW}Warning: Could not get video duration. Cannot proceed with splitting.{Style.RESET_ALL}")
         return
 
-    print(f"{Fore.BLUE}Processing clips...{Style.RESET_ALL}")
+    print(f"\nProcessing clips...")
 
     if encoder_type == '1': # CPU Encoding
         video_codec = "libx264"
         crf = "18"
-        print(f"{Fore.CYAN}Using CPU encoding for high quality. This may take longer.{Style.RESET_ALL}")
+        print(f"{Style.DIM}Using CPU encoding for higher quality.{Style.RESET_ALL}")
     else: # GPU Encoding
         if gpu_brand == '1':
             video_codec = "h264_nvenc"
@@ -87,8 +87,9 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
             video_codec = "libx264"
             print(f"{Fore.YELLOW}No valid GPU brand selected. Reverting to CPU encoding.{Style.RESET_ALL}")
         crf = "23"
-        print(f"{Fore.CYAN}Using GPU encoding for speed. Quality may vary.{Style.RESET_ALL}")
-    
+        print(f"{Style.DIM}Using GPU encoding for speed.{Style.RESET_ALL}")
+    print()
+
     # Configure FFmpeg output based on preferences.SHOW_STATS
     if preferences.SHOW_STATS:
         # Show full progress with stats and errors
@@ -136,15 +137,12 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         if crop_vertical:
             cmd.insert(-1, "-vf")
             cmd.insert(-1, "crop=ih*9/16:ih:(iw-ih*9/16)/2:0")
-
         try:
             subprocess.run(cmd, check=True)
-            print(f"✅ Created clip: {new_filename}")
+            print(f"➕ Created clip: {Fore.BLUE}{new_filename}{Style.RESET_ALL}")
         except subprocess.CalledProcessError as e:
-            print(f"{Fore.RED}Error processing clip {new_filename}: {e}{Style.RESET_ALL}")
-        
+            print(f"{Fore.RED}Error processing clip {Fore.BLUE}{new_filename}{Fore.RED}: {e}{Style.RESET_ALL}")
         start_time += segment_length
-
     print("\n✅ Processing complete!\n")
 
 # -------------------- Main -------------------- #
