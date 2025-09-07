@@ -88,6 +88,16 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
             print(f"{Fore.YELLOW}No valid GPU brand selected. Reverting to CPU encoding.{Style.RESET_ALL}")
         crf = "23"
         print(f"{Fore.CYAN}Using GPU encoding for speed. Quality may vary.{Style.RESET_ALL}")
+    
+    # Configure FFmpeg output based on preferences.SHOW_STATS
+    if preferences.SHOW_STATS:
+        # Show full progress with stats and errors
+        log_level = "error"
+        stats = ""
+    else:
+        # Suppress most output and show only errors
+        log_level = "quiet"
+        stats = "-nostats"
 
     start_time = 0
     clip_count = 0
@@ -109,6 +119,9 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         # Base FFmpeg command with acceleration
         cmd = [
             "ffmpeg",
+            "-hide_banner",
+            "-loglevel", log_level,
+            stats,
             "-ss", str(start_time),
             "-i", input_path,
             "-t", str(segment_length),
