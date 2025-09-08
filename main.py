@@ -235,7 +235,7 @@ if __name__ == "__main__":
         num_clips = int((duration + segment_length - 1) // segment_length)
         est_size = size  # splitting copies streams → size ≈ same as input
         estimated_clip_size = est_size / num_clips if num_clips > 0 else 0
-        print("\nVideo info:")
+        print(f"\n{Style.BRIGHT}Video info{Style.RESET_ALL}")
         print(f"{Style.DIM}- Selected file: {Style.NORMAL}{Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
         print(f"{Style.DIM}- Video duration: {Style.RESET_ALL}{format_seconds(duration)}")
         print(f"{Style.DIM}- Clip length: {Style.RESET_ALL}{format_seconds(segment_length)}")
