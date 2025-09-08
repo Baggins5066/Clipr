@@ -53,8 +53,13 @@ def get_video_info(input_path):
              "-of", "default=noprint_wrappers=1:nokey=1", input_path],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True
         )
-        duration, size = result.stdout.strip().splitlines()
-        return float(duration), int(size)
+        duration_str, size_str = result.stdout.strip().splitlines()
+
+        # Check for 'N/A' and set to 0
+        duration = float(duration_str) if duration_str != 'N/A' else 0
+        size = int(size_str) if size_str != 'N/A' else 0
+
+        return duration, size
     except Exception as e:
         print(f"{Fore.RED}ffprobe failed: {e}{Style.RESET_ALL}")
         return 0, 0
