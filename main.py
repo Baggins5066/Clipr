@@ -176,7 +176,6 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
 # -------------------- Main -------------------- #
 if __name__ == "__main__":
     input_path = pick_video_file()
-    print(f"\nSelected file: {Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
 
     seconds_str = get_input_with_escape(f"Enter clip length in seconds:\n> {Fore.BLUE}").strip()
     print(Style.RESET_ALL, end='')  # Reset color after input
@@ -186,7 +185,7 @@ if __name__ == "__main__":
         print("Invalid number for clip length. Exiting.")
         sys.exit(0)
 
-    print(f"Crop to Shorts vertical format? {Style.DIM}Cropping requires re-encoding; output size may differ.{Style.RESET_ALL}")
+    print(f"\nCrop to Shorts vertical format? {Style.DIM}Cropping requires re-encoding; output size may differ.{Style.RESET_ALL}")
     print(f"{Style.BRIGHT}{Fore.GREEN}[1] {Style.NORMAL}Yes")
     print(f"{Style.BRIGHT}{Fore.RED}[2] {Style.NORMAL}No")
     crop_choice = get_input_with_escape(f"{Style.RESET_ALL}> ").strip().lower()
@@ -200,6 +199,7 @@ if __name__ == "__main__":
         num_clips = int((duration + segment_length - 1) // segment_length)
         est_size = size  # splitting copies streams → size ≈ same as input
         print("\nVideo info:")
+        print(f"{Style.DIM}- Selected file: {Style.NORMAL}{Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
         print(f"{Style.DIM}- Duration: {Style.RESET_ALL}{duration/60:.2f} minutes")
         print(f"{Style.DIM}- Clip length: {Style.RESET_ALL}{segment_length/60:.2f} minutes")
         print(f"{Style.DIM}- Number of clips: {Style.RESET_ALL}{num_clips}")
