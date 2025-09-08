@@ -37,8 +37,7 @@ def pick_video_file():
     root.withdraw()
     file_path = filedialog.askopenfilename(
         title="Select video file",
-        filetypes=[("Video files", "*.mp4;*.avi;*.mov;*.mkv;*.flv;*.wmv"),
-                   ("All files", "*.*")]
+        filetypes=[("Video files", "*.mp4;*.avi;*.mov;*.mkv;*.flv;*.wmv;*.webm"), ("All files", "*.*")]
     )
     root.destroy()
     if not file_path:
