@@ -64,15 +64,37 @@ def get_video_info(input_path):
         print(f"{Fore.RED}ffprobe failed: {e}{Style.RESET_ALL}")
         return 0, 0
 
+def fix_video_for_seeking(input_path):
+    print(f"Fixing video for seeking. This may take a moment...")
+    fixed_path = os.path.splitext(input_path)[0] + "_fixed.mp4"
+    cmd = [
+        "ffmpeg",
+        "-i", input_path,
+        "-c", "copy",
+        "-movflags", "+faststart",
+        fixed_path
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+        print(f"Video fixed! New file: {fixed_path}")
+        return fixed_path
+    except subprocess.CalledProcessError as e:
+        print(f"Error fixing video: {e}")
+        return None
+
 # -------------------- Splitting -------------------- #
 def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, export_dir="Clips", crop_vertical=False):
     os.makedirs(export_dir, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(input_path))[0]
+    
+    # Check and fix video for seeking
     duration, _ = get_video_info(input_path)
-
     if duration == 0:
-        print(f"{Fore.YELLOW}Warning: Could not get video duration. Cannot proceed with splitting.{Style.RESET_ALL}")
-        return
+        print(f"{Fore.YELLOW}Warning: Video is not seekable. Attempting to fix...{Style.RESET_ALL}")
+        input_path = fix_video_for_seeking(input_path)
+        if not input_path:
+            return # Exit if fixing fails
+        duration, _ = get_video_info(input_path) # Get duration of the new fixed file
 
     print(f"\nProcessing clips...")
 
