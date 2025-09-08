@@ -125,9 +125,11 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         # Suppress most output and show only errors
         log_level = "quiet"
         stats = "-nostats"
-
+        
     start_time = 0
     clip_count = 0
+    total_clips = int(duration // segment_length) + (1 if duration % segment_length != 0 else 0)
+
     while start_time < duration:
         clip_count += 1
         end_time = min(start_time + segment_length, duration)
@@ -165,7 +167,7 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
             cmd.insert(-1, "crop=ih*9/16:ih:(iw-ih*9/16)/2:0")
         try:
             subprocess.run(cmd, check=True)
-            print(f"➕ Created clip: {Fore.BLUE}{new_filename}{Style.RESET_ALL}")
+            print(f"➕ Created clip {Fore.BLUE}{new_filename}{Style.RESET_ALL} ({clip_count}/{total_clips})")
         except subprocess.CalledProcessError as e:
             print(f"{Fore.RED}Error processing clip {Fore.BLUE}{new_filename}{Fore.RED}: {e}{Style.RESET_ALL}")
         start_time += segment_length
