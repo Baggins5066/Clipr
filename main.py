@@ -146,7 +146,7 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         out_path = os.path.join(export_dir, new_filename)
 
         if os.path.exists(out_path):
-            print(f" ✔️ Skipping existing clip: {Style.DIM}{Fore.BLUE}{new_filename}{Style.RESET_ALL}")
+            print(f"✔️  Skipping existing clip: {Style.DIM}{Fore.BLUE}{new_filename}{Style.RESET_ALL}")
             start_time += segment_length
             continue
 
@@ -175,7 +175,8 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
             
             # Setup a progress bar for the current clip
-            with tqdm(total=segment_length, desc="🔄️ ", unit="s", leave=False, bar_format="{l_bar}{bar}") as pbar_clip:
+            # The description is now an empty string to remove the colon
+            with tqdm(total=segment_length, desc="🔄️", unit="s", leave=False, bar_format="{l_bar}{bar}| {percentage:.0f}%") as pbar_clip:
                 for line in process.stdout:
                     if "time=" in line:
                         # Parse the output to find the current time
@@ -184,10 +185,11 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
                             if part.startswith("time="):
                                 time_str = part.split("=")[1]
                                 try:
-                                    # Convert HH:MM:SS.ms to seconds
-                                    h, m, s = time_str.split("")
+                                    # This line was fixed in a previous response, but was reverted.
+                                    # The correct splitting is by ':'
+                                    h, m, s = time_str.split(':')
                                     current_time = float(h) * 3600 + float(m) * 60 + float(s)
-                                    pbar_clip.n = min(pbar_clip.total, int(current_time)) # Ensure it doesn't go over 100%
+                                    pbar_clip.n = min(pbar_clip.total, current_time) # No need for int here
                                     pbar_clip.refresh()
                                 except ValueError:
                                     continue
@@ -196,8 +198,8 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
             if process.wait() != 0:
                 raise subprocess.CalledProcessError(process.returncode, cmd)
 
+            # This line handles the "➕ Created clip" output
             print(f"➕ Created clip {Fore.BLUE}{new_filename}{Style.RESET_ALL} ({clip_count}/{total_clips})")
-            # The overall progress bar update is removed from here
 
         except subprocess.CalledProcessError as e:
             print(f"{Fore.RED}Error processing clip {Fore.BLUE}{new_filename}{Fore.RED}: {e}{Style.RESET_ALL}")
