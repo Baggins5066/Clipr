@@ -83,7 +83,7 @@ def fix_video_for_seeking(input_path):
         return None
 
 # -------------------- Splitting -------------------- #
-def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, export_dir="Clips", crop_vertical=False):
+def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, export_dir, crop_vertical=False):
     os.makedirs(export_dir, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(input_path))[0]
     
@@ -211,4 +211,4 @@ if __name__ == "__main__":
         f"{Fore.RED}{Style.BRIGHT}\n[ESC]{Style.NORMAL} Cancel\n{Style.RESET_ALL}> "
     ).strip()
 
-    split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, crop_vertical=crop_vertical)
+    split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, export_dir=preferences.EXPORT_LOCATION, crop_vertical=crop_vertical)
