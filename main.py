@@ -82,6 +82,16 @@ def fix_video_for_seeking(input_path):
         print(f"Error fixing video: {e}")
         return None
 
+def format_seconds(seconds):
+    """Converts a duration in seconds to HH:MM:SS or MM:SS format with no leading zeros."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    else:
+        return f"{minutes}:{secs:02d}"
+
 # -------------------- Splitting -------------------- #
 def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, export_dir, crop_vertical=False):
     os.makedirs(export_dir, exist_ok=True)
@@ -198,12 +208,13 @@ if __name__ == "__main__":
     else:
         num_clips = int((duration + segment_length - 1) // segment_length)
         est_size = size  # splitting copies streams → size ≈ same as input
+        estimated_clip_size = est_size / num_clips if num_clips > 0 else 0
         print("\nVideo info:")
         print(f"{Style.DIM}- Selected file: {Style.NORMAL}{Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
-        print(f"{Style.DIM}- Duration: {Style.RESET_ALL}{duration/60:.2f} minutes")
-        print(f"{Style.DIM}- Clip length: {Style.RESET_ALL}{segment_length/60:.2f} minutes")
+        print(f"{Style.DIM}- Video duration: {Style.RESET_ALL}{format_seconds(duration)}")
+        print(f"{Style.DIM}- Clip length: {Style.RESET_ALL}{format_seconds(segment_length)}")
         print(f"{Style.DIM}- Number of clips: {Style.RESET_ALL}{num_clips}")
-        print(f"{Style.DIM}- Estimated total output size: {Style.RESET_ALL}{est_size/1e6:.2f} MB")
+        print(f"{Style.DIM}- Estimated clip size: {Style.RESET_ALL}{estimated_clip_size/1e6:.2f} MB ({est_size/1e6:.2f} MB total)")
         print(f"{Style.DIM}- Crop: {Style.RESET_ALL}{'Yes' if crop_vertical else 'No'}")
 
     confirm = get_input_with_escape(
