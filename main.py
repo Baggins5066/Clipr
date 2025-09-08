@@ -146,7 +146,7 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         out_path = os.path.join(export_dir, new_filename)
 
         if os.path.exists(out_path):
-            print(f"✔️  Skipping existing clip {Style.DIM}{Fore.BLUE}{new_filename}{Style.RESET_ALL} ({clip_count}/{total_clips})")
+            print(f"✔️ Skipping existing clip {Style.DIM}{Fore.BLUE}{new_filename}{Style.RESET_ALL} ({clip_count}/{total_clips})")
             start_time += segment_length
             continue
 
@@ -205,7 +205,7 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
             print(f"{Fore.RED}Error processing clip {Fore.BLUE}{new_filename}{Fore.RED}: {e}{Style.RESET_ALL}")
         
         start_time += segment_length
-    print("\n✅ Processing complete!\n")
+    print("✅ Processing complete!\n")
 
 # -------------------- Main -------------------- #
 if __name__ == "__main__":
