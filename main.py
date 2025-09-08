@@ -93,7 +93,7 @@ def format_seconds(seconds):
         return f"{minutes}:{secs:02d}"
 
 # -------------------- Splitting -------------------- #
-def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, export_dir, crop_vertical=False):
+def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, export_dir, crop_filter=None):
     os.makedirs(export_dir, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(input_path))[0]
     
@@ -172,9 +172,9 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         ]
         
         # Add cropping filter if needed
-        if crop_vertical:
+        if crop_filter:
             cmd.insert(-1, "-vf")
-            cmd.insert(-1, "crop=ih*9/16:ih:(iw-ih*9/16)/2:0")
+            cmd.insert(-1, crop_filter)
         try:
             subprocess.run(cmd, check=True)
             print(f"➕ Created clip {Fore.BLUE}{new_filename}{Style.RESET_ALL} ({clip_count}/{total_clips})")
@@ -185,6 +185,24 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
 
 # -------------------- Main -------------------- #
 if __name__ == "__main__":
+    
+    # Map crop ratios from preferences.py to FFmpeg filters
+    CROP_FILTERS = {
+        '1:2': 'crop=ih/2:ih:iw/4:0',
+        '9:16': 'crop=ih*9/16:ih:(iw-ih*9/16)/2:0',
+        '2:3': 'crop=ih*2/3:ih:(iw-ih*2/3)/2:0',
+        '5:7': 'crop=ih*5/7:ih:(iw-ih*5/7)/2:0',
+        '3:4': 'crop=ih*3/4:ih:(iw-ih*3/4)/2:0',
+        '4:5': 'crop=ih*4/5:ih:(iw-ih*4/5)/2:0',
+        '1:1': 'crop=ih:ih:(iw-ih)/2:0',
+        '5:4': 'crop=iw:iw*4/5:0:ih/10',
+        '4:3': 'crop=iw:iw*3/4:0:ih/8',
+        '7:5': 'crop=iw:iw*5/7:0:ih/7',
+        '3:2': 'crop=iw:iw*2/3:0:ih/6',
+        '16:9': 'crop=iw:iw*9/16:0:ih/8',
+        '2.39:1': 'crop=iw:iw*1/2.39:0:ih/2',
+    }
+    
     input_path = pick_video_file()
 
     seconds_str = get_input_with_escape(f"Enter clip length in seconds:\n> {Fore.BLUE}").strip()
@@ -195,12 +213,20 @@ if __name__ == "__main__":
         print("Invalid number for clip length. Exiting.")
         sys.exit(0)
 
-    print(f"\nCrop to Shorts vertical format? {Style.DIM}Cropping requires re-encoding; output size may differ.{Style.RESET_ALL}")
+    print(f"\nCrop video to {Fore.BLUE}{preferences.CROP_RATIO}{Style.RESET_ALL} aspect ratio?")
     print(f"{Style.BRIGHT}{Fore.GREEN}[1] {Style.NORMAL}Yes")
     print(f"{Style.BRIGHT}{Fore.RED}[2] {Style.NORMAL}No")
     crop_choice = get_input_with_escape(f"{Style.RESET_ALL}> ").strip().lower()
-    crop_vertical = crop_choice == "1"
     
+    selected_crop_ratio = "No"
+    selected_crop_filter = None
+    if crop_choice == '1':
+        selected_crop_ratio = preferences.CROP_RATIO
+        selected_crop_filter = CROP_FILTERS.get(selected_crop_ratio, None)
+        if not selected_crop_filter:
+            print(f"{Fore.YELLOW}Warning: Invalid crop ratio '{selected_crop_ratio}' found in preferences. No cropping will be applied.{Style.RESET_ALL}")
+            selected_crop_ratio = "Invalid"
+
     # --- Preview Info --- #
     duration, size = get_video_info(input_path)
     if duration == 0:
@@ -215,11 +241,11 @@ if __name__ == "__main__":
         print(f"{Style.DIM}- Clip length: {Style.RESET_ALL}{format_seconds(segment_length)}")
         print(f"{Style.DIM}- Number of clips: {Style.RESET_ALL}{num_clips}")
         print(f"{Style.DIM}- Estimated clip size: {Style.RESET_ALL}{estimated_clip_size/1e6:.2f} MB ({est_size/1e6:.2f} MB total)")
-        print(f"{Style.DIM}- Crop: {Style.RESET_ALL}{'Yes' if crop_vertical else 'No'}")
+        print(f"{Style.DIM}- Crop: {Style.RESET_ALL}{selected_crop_ratio}")
 
     confirm = get_input_with_escape(
         f"{Fore.GREEN}{Style.BRIGHT}\n[ENTER]{Style.NORMAL} Start processing{Style.RESET_ALL}"
         f"{Fore.RED}{Style.BRIGHT}\n[ESC]{Style.NORMAL} Cancel\n{Style.RESET_ALL}> "
     ).strip()
 
-    split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, export_dir=preferences.EXPORT_LOCATION, crop_vertical=crop_vertical)
+    split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, export_dir=preferences.EXPORT_LOCATION, crop_filter=selected_crop_filter)
