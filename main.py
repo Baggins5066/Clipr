@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import filedialog
 import subprocess
 from colorama import init, Fore, Style
+from tqdm import tqdm
 import preferences
 
 init()
@@ -126,20 +127,14 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         print(f"{Style.DIM}Using GPU encoding for speed.{Style.RESET_ALL}")
     print()
 
-    # Configure FFmpeg output based on preferences.SHOW_STATS
-    if preferences.SHOW_STATS:
-        # Show full progress with stats and errors
-        log_level = "error"
-        stats = ""
-    else:
-        # Suppress most output and show only errors
-        log_level = "quiet"
-        stats = "-nostats"
+    # The log_level is now constant for the progress bar to work
+    log_level = "info"
         
     start_time = 0
     clip_count = 0
     total_clips = int(duration // segment_length) + (1 if duration % segment_length != 0 else 0)
 
+    # The overall progress bar is removed from here
     while start_time < duration:
         clip_count += 1
         end_time = min(start_time + segment_length, duration)
@@ -160,7 +155,6 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
             "ffmpeg",
             "-hide_banner",
             "-loglevel", log_level,
-            stats,
             "-ss", str(start_time),
             "-i", input_path,
             "-t", str(segment_length),
@@ -168,18 +162,46 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
             "-c:a", "aac",
             "-crf", crf, "-preset", "medium",
             "-y", # Overwrite output files without asking
-            out_path
         ]
         
         # Add cropping filter if needed
         if crop_filter:
-            cmd.insert(-1, "-vf")
-            cmd.insert(-1, crop_filter)
+            cmd.extend(["-vf", crop_filter])
+
+        cmd.append(out_path) # Append output path at the very end
+        
         try:
-            subprocess.run(cmd, check=True)
+            # Use Popen to get real-time output
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            
+            # Setup a progress bar for the current clip
+            with tqdm(total=segment_length, desc="🔄️ ", unit="s", leave=False, bar_format="{l_bar}{bar}") as pbar_clip:
+                for line in process.stdout:
+                    if "time=" in line:
+                        # Parse the output to find the current time
+                        parts = line.split()
+                        for part in parts:
+                            if part.startswith("time="):
+                                time_str = part.split("=")[1]
+                                try:
+                                    # Convert HH:MM:SS.ms to seconds
+                                    h, m, s = time_str.split("")
+                                    current_time = float(h) * 3600 + float(m) * 60 + float(s)
+                                    pbar_clip.n = min(pbar_clip.total, int(current_time)) # Ensure it doesn't go over 100%
+                                    pbar_clip.refresh()
+                                except ValueError:
+                                    continue
+            
+            # Check the process return code after it finishes
+            if process.wait() != 0:
+                raise subprocess.CalledProcessError(process.returncode, cmd)
+
             print(f"➕ Created clip {Fore.BLUE}{new_filename}{Style.RESET_ALL} ({clip_count}/{total_clips})")
+            # The overall progress bar update is removed from here
+
         except subprocess.CalledProcessError as e:
             print(f"{Fore.RED}Error processing clip {Fore.BLUE}{new_filename}{Fore.RED}: {e}{Style.RESET_ALL}")
+        
         start_time += segment_length
     print("\n✅ Processing complete!\n")
 
