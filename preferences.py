@@ -27,21 +27,20 @@ GPU_BRAND = '1'
 
 # Crop ratio
 CROP_RATIO = '9:16'
-	# Common aspect ratios:
-		# 1:2 (Vertical)
-		# 9:16 (Vertical)
-		# 2:3 (Vertical)
-		# 5:7 (Vertical)
-		# 3:4 (Vertical)
-		# 4:5 (Vertical)
-		# 1:1 (Square)
-		# 5:4 (Horizontal)
-		# 4:3 (Horizontal)
-		# 7:5 (Horizontal)
-		# 3:2 (Horizontal)
-		# 16:9 (Horizontal)
-		# 2.39:1 (Cinematic Horizontal)
-		# Call of Duty
+	# 1:2 (Vertical)
+	# 9:16 (Vertical)
+	# 2:3 (Vertical)
+	# 5:7 (Vertical)
+	# 3:4 (Vertical)
+	# 4:5 (Vertical)
+	# 1:1 (Square)
+	# 5:4 (Horizontal)
+	# 4:3 (Horizontal)
+	# 7:5 (Horizontal)
+	# 3:2 (Horizontal)
+	# 16:9 (Horizontal)
+	# 2.39:1 (Cinematic Horizontal)
+  # Call of Duty
 
 # Show stats during processing
 SHOW_STATS = False
