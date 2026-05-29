@@ -3,6 +3,7 @@ import os
 import sys
 import msvcrt
 import subprocess
+import threading
 from colorama import init, Fore, Style
 from tqdm import tqdm
 import preferences
@@ -112,6 +113,17 @@ def format_seconds(seconds):
     else:
         return f"{minutes}:{secs:02d}"
 
+def watch_for_escape(cancel_event, stop_event):
+    while not cancel_event.is_set() and not stop_event.is_set():
+        if msvcrt.kbhit():
+            if msvcrt.getwch() == '\x1b':
+                cancel_event.set()
+                while msvcrt.kbhit():
+                    msvcrt.getwch()
+                return
+        else:
+            cancel_event.wait(0.05)
+
 # -------------------- Splitting -------------------- #
 def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, export_dir, crop_filter=None):
     os.makedirs(export_dir, exist_ok=True)
@@ -192,31 +204,54 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         try:
             # Use Popen to get real-time output
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            cancel_event = threading.Event()
+            stop_event = threading.Event()
+            did_cancel = False
             
             # Setup a progress bar for the current clip
             # The description is now an empty string to remove the colon
             with tqdm(total=segment_length, desc="🔄️", unit="s", leave=False, bar_format="{l_bar}{bar}| {percentage:.0f}%") as pbar_clip:
-                for line in process.stdout:
-                    if "time=" in line:
-                        # Parse the output to find the current time
-                        parts = line.split()
-                        for part in parts:
-                            if part.startswith("time="):
-                                time_str = part.split("=")[1]
-                                try:
-                                    # This line was fixed in a previous response, but was reverted.
-                                    # The correct splitting is by ':'
-                                    h, m, s = time_str.split(':')
-                                    current_time = float(h) * 3600 + float(m) * 60 + float(s)
-                                    pbar_clip.n = min(pbar_clip.total, current_time) # No need for int here
-                                    pbar_clip.refresh()
-                                except ValueError:
-                                    continue
-            
-            # Check the process return code after it finishes
-            if process.wait() != 0:
-                raise subprocess.CalledProcessError(process.returncode, cmd)
-
+                def read_ffmpeg_output():
+                    for line in process.stdout:
+                        if "time=" in line:
+                            # Parse the output to find the current time
+                            parts = line.split()
+                            for part in parts:
+                                if part.startswith("time="):
+                                    time_str = part.split("=")[1]
+                                    try:
+                                        h, m, s = time_str.split(':')
+                                        current_time = float(h) * 3600 + float(m) * 60 + float(s)
+                                        pbar_clip.n = min(pbar_clip.total, current_time)
+                                        pbar_clip.refresh()
+                                    except ValueError:
+                                        continue
+                output_thread = threading.Thread(target=read_ffmpeg_output, daemon=True)
+                cancel_thread = threading.Thread(target=watch_for_escape, args=(cancel_event, stop_event), daemon=True)
+                output_thread.start()
+                cancel_thread.start()
+                while process.poll() is None:
+                    if cancel_event.is_set():
+                        did_cancel = True
+                        process.terminate()
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait()
+                        break
+                    cancel_event.wait(0.1)
+            output_thread.join(timeout=1)
+            stop_event.set()
+            cancel_thread.join(timeout=1)
+            return_code = process.returncode if process.returncode is not None else process.wait()
+            if did_cancel:
+                if return_code != 0 and os.path.exists(out_path):
+                    os.remove(out_path)
+                print(f"{Fore.YELLOW}Processing cancelled.{Style.RESET_ALL}")
+                return False
+            if return_code != 0:
+                raise subprocess.CalledProcessError(return_code, cmd)
             # This line handles the "➕ Created clip" output
             print(f"➕ Created clip {Fore.BLUE}{new_filename}{Style.RESET_ALL} ({clip_count}/{total_clips})")
 
@@ -225,6 +260,7 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         
         start_time += segment_length
     print("✅ Processing complete!\n")
+    return True
 
 # -------------------- Main -------------------- #
 if __name__ == "__main__":
@@ -293,4 +329,6 @@ if __name__ == "__main__":
 
     for input_path in input_paths:
         print(f"\n{Style.BRIGHT}Processing file:{Style.RESET_ALL} {Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
-        split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, export_dir=preferences.EXPORT_LOCATION, crop_filter=selected_crop_filter)
+        completed = split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, export_dir=preferences.EXPORT_LOCATION, crop_filter=selected_crop_filter)
+        if not completed:
+            break
