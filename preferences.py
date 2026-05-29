@@ -32,6 +32,7 @@ CROP_RATIO = '9:16'
         # 3:2 (Horizontal)
         # 16:9 (Horizontal)
         # 2.39:1 (Cinematic Horizontal)
+        # Call of Duty
 
 # Show stats during processing
 SHOW_STATS = False
