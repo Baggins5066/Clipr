@@ -1,7 +1,37 @@
-This is a Python script that uses FFmpeg to split a video file into multiple smaller clips of a specified length. The program provides options for GPU-accelerated encoding and for cropping the video into a vertical format suitable for platforms like YouTube Shorts or TikTok.
+# Clipr
+## Prerequisites
 
-Before running the script, you'll need to install the following:
+- Python 3.8 or newer
+- Git (optional, for cloning the repo)
 
-FFmpeg: This program is an external dependency used for video processing. You must have it installed and available in your system's PATH. You can download it from the official FFmpeg website.
+## Installation
 
-Python Packages: The script requires a few Python libraries. You can install them using pip with the provided requirements.txt file.
+1. Create and activate a virtual environment (recommended):
+
+```powershell
+python -m venv .venv
+```
+
+2. Install dependencies:
+
+```powershell
+pip install -r requirements.txt
+```
+
+## Running
+
+On Windows you can run the included batch helper:
+
+```powershell
+Clipr.bat
+```
+
+Or run the main script directly with Python:
+
+```powershell
+python main.py
+```
+
+## Configuration
+
+Edit `preferences.py` to change important settings. Save changes before re-running the program.
