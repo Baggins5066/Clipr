@@ -21,7 +21,7 @@ def load_local_preferences():
         spec.loader.exec_module(module)
     except Exception:
         return
-    for key in ("CLIP_LENGTH", "EXPORT_LOCATION", "ENCODER", "GPU_BRAND", "CROP_RATIO", "SHOW_STATS"):
+    for key in ("CLIP_LENGTH", "EXPORT_LOCATION", "ENCODER", "GPU_BRAND", "CROP_RATIO", "TARGET_FPS", "SHOW_STATS"):
         if hasattr(module, key):
             setattr(preferences, key, getattr(module, key))
 load_local_preferences()
@@ -41,7 +41,7 @@ def get_input_with_escape(prompt):
                 msvcrt.getch()
             return ''.join(chars)
         elif ch == '\x1b':  # ESC key
-            print("\nESC pressed. Exited program.")
+            print(f"\n{Fore.YELLOW}Processing cancelled.{Style.RESET_ALL}")
             sys.exit(0)
         elif ch == '\x08':  # Backspace
             if chars:
@@ -124,6 +124,15 @@ def watch_for_escape(cancel_event, stop_event):
         else:
             cancel_event.wait(0.05)
 
+def parse_target_fps(value):
+    if value in (None, "", 0, "0"):
+        return None
+    try:
+        fps = float(value)
+    except (TypeError, ValueError):
+        return None
+    return fps if fps > 0 else None
+
 # -------------------- Splitting -------------------- #
 def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, export_dir, crop_filter=None):
     os.makedirs(export_dir, exist_ok=True)
@@ -142,22 +151,29 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
 
     if encoder_type == '1': # CPU Encoding
         video_codec = "libx264"
-        crf = "18"
-        print(f"{Style.DIM}Using CPU encoding for higher quality.{Style.RESET_ALL}")
+        encoder_args = ["-crf", "18", "-preset", "slow"]
+        print(f"{Style.DIM}Using CPU encoding{Style.RESET_ALL}")
     else: # GPU Encoding
         if gpu_brand == '1':
             video_codec = "h264_nvenc"
+            encoder_args = ["-preset", "p6", "-rc:v", "vbr", "-cq:v", "19", "-b:v", "0"]
+            print(f"{Style.DIM}Using NVIDIA GPU encoding{Style.RESET_ALL}")
         elif gpu_brand == '2':
             video_codec = "h264_qsv"
+            encoder_args = ["-global_quality", "19", "-preset", "medium"]
+            print(f"{Style.DIM}Using Intel GPU encoding{Style.RESET_ALL}")
         elif gpu_brand == '3':
             video_codec = "h264_amf"
+            encoder_args = ["-rc", "cqp", "-qp_i", "18", "-qp_p", "18", "-quality", "quality"]
+            print(f"{Style.DIM}Using AMD GPU encoding{Style.RESET_ALL}")
         else:
             video_codec = "libx264"
-            print(f"{Fore.YELLOW}No valid GPU brand selected. Reverting to CPU encoding.{Style.RESET_ALL}")
-        crf = "23"
-        print(f"{Style.DIM}Using GPU encoding for speed.{Style.RESET_ALL}")
+            encoder_args = ["-crf", "18", "-preset", "slow"]
+            print(f"{Fore.YELLOW}No valid GPU brand is selected. Reverting to CPU encoding{Style.RESET_ALL}")
     print()
-
+    target_fps = parse_target_fps(getattr(preferences, "TARGET_FPS", None))
+    if target_fps is not None:
+        print(f"{Style.DIM}Forcing output fps to {target_fps:g}.{Style.RESET_ALL}")
     # The log_level is now constant for the progress bar to work
     log_level = "info"
         
@@ -191,14 +207,15 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
             "-t", str(segment_length),
             "-c:v", video_codec,
             "-c:a", "aac",
-            "-crf", crf, "-preset", "medium",
             "-y", # Overwrite output files without asking
         ]
+        cmd.extend(encoder_args)
         
         # Add cropping filter if needed
         if crop_filter:
             cmd.extend(["-vf", crop_filter])
-
+        if target_fps is not None:
+            cmd.extend(["-r", f"{target_fps:g}"])
         cmd.append(out_path) # Append output path at the very end
         
         try:
