@@ -41,7 +41,7 @@ def get_input_with_escape(prompt):
                 msvcrt.getch()
             return ''.join(chars)
         elif ch == '\x1b':  # ESC key
-            print("\nESC pressed. Exited program.")
+            print(f"\n{Fore.YELLOW}Processing cancelled.{Style.RESET_ALL}")
             sys.exit(0)
         elif ch == '\x08':  # Backspace
             if chars:
