@@ -1,8 +1,70 @@
-*
-!.gitignore
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# PyInstaller build output (project contains a build/ folder)
+dist/
+build/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+htmlcov/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Environments
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+
+# VS Code settings
+.vscode/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Python compiled files
+*.pyc
+*.pyo
+*.pyd
+
+# Keep these project files tracked
 !README.md
-!Exports/
+!requirements.txt
 !main.py
 !preferences.py
 !Clipr.bat
-!requirements.txt
+!Exports/
