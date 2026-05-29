@@ -1,3 +1,4 @@
+import importlib.util
 import os
 import sys
 import msvcrt
@@ -5,6 +6,24 @@ import subprocess
 from colorama import init, Fore, Style
 from tqdm import tqdm
 import preferences
+
+def load_local_preferences():
+    """Load local overrides from preferences_local.py if present."""
+    local_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preferences_local.py")
+    if not os.path.isfile(local_path):
+        return
+    spec = importlib.util.spec_from_file_location("preferences_local", local_path)
+    if spec is None or spec.loader is None:
+        return
+    try:
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except Exception:
+        return
+    for key in ("CLIP_LENGTH", "EXPORT_LOCATION", "ENCODER", "GPU_BRAND", "CROP_RATIO", "SHOW_STATS"):
+        if hasattr(module, key):
+            setattr(preferences, key, getattr(module, key))
+load_local_preferences()
 
 init()
 
