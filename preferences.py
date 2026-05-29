@@ -1,6 +1,10 @@
 import importlib.util
 import os
 
+# Clip length in seconds
+CLIP_LENGTH = 60
+    # Default: 60
+
 # Export location for clips
 EXPORT_LOCATION = r"Exports"
     # Default: "Exports" in current directory
@@ -57,7 +61,7 @@ def _load_local_preferences():
         return
 
     # Only known preference keys are allowed to override defaults.
-    for key in ("EXPORT_LOCATION", "ENCODER", "GPU_BRAND", "CROP_RATIO", "SHOW_STATS"):
+    for key in ("CLIP_LENGTH", "EXPORT_LOCATION", "ENCODER", "GPU_BRAND", "CROP_RATIO", "SHOW_STATS"):
         if hasattr(module, key):
             globals()[key] = getattr(module, key)
 

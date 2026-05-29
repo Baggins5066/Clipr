@@ -235,27 +235,19 @@ if __name__ == "__main__":
         print(f"No video files found in {imports_dir}. Add videos there and run the script again.")
         sys.exit(0)
 
-    seconds_str = get_input_with_escape(f"Enter clip length in seconds:\n> {Fore.BLUE}").strip()
-    print(Style.RESET_ALL, end='')  # Reset color after input
+    # Use clip length from preferences
     try:
-        segment_length = int(seconds_str)
-    except ValueError:
-        print("Invalid number for clip length. Exiting.")
+        segment_length = int(preferences.CLIP_LENGTH)
+    except Exception:
+        print("Invalid CLIP_LENGTH in preferences. Exiting.")
         sys.exit(0)
 
-    print(f"\nCrop video to {Fore.BLUE}{preferences.CROP_RATIO}{Style.RESET_ALL} aspect ratio?")
-    print(f"{Style.BRIGHT}{Fore.GREEN}[1] {Style.NORMAL}Yes")
-    print(f"{Style.BRIGHT}{Fore.RED}[2] {Style.NORMAL}No")
-    crop_choice = get_input_with_escape(f"{Style.RESET_ALL}> ").strip().lower()
-    
-    selected_crop_ratio = "No"
-    selected_crop_filter = None
-    if crop_choice == '1':
-        selected_crop_ratio = preferences.CROP_RATIO
-        selected_crop_filter = CROP_FILTERS.get(selected_crop_ratio, None)
-        if not selected_crop_filter:
-            print(f"{Fore.YELLOW}Warning: Invalid crop ratio '{selected_crop_ratio}' found in preferences. No cropping will be applied.{Style.RESET_ALL}")
-            selected_crop_ratio = "Invalid"
+    # Use crop ratio from preferences
+    selected_crop_ratio = preferences.CROP_RATIO
+    selected_crop_filter = CROP_FILTERS.get(selected_crop_ratio, None)
+    if not selected_crop_filter:
+        print(f"{Fore.YELLOW}Warning: Invalid crop ratio '{selected_crop_ratio}' found in preferences. No cropping will be applied.{Style.RESET_ALL}")
+        selected_crop_ratio = "Invalid"
 
     # --- Preview Info --- #
     first_input_path = input_paths[0]
