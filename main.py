@@ -237,8 +237,6 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
     if target_fps is not None:
         print(f"{Style.DIM}Forcing output fps to {target_fps:g}.{Style.RESET_ALL}")
     source_fps = get_video_fps(input_path)
-    if source_fps is not None and crop_filter and "color=c=black:s=810x1440" in crop_filter:
-        print(f"{Style.DIM}Using source fps {source_fps:g} for the Call of Duty canvas.{Style.RESET_ALL}")
     # The log_level is now constant for the progress bar to work
     log_level = "info"
         
