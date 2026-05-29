@@ -2,6 +2,15 @@
 CLIP_LENGTH = 60
     # Default: 60
 
+# Output video FPS
+TARGET_FPS = None
+    # Default: None
+        # Keeps the FPS of the original import
+    # Common FPS values:
+        # 24 (Cinematic)
+        # 30 (Standard)
+        # 60 (High Frame Rate)
+
 # Export location for clips
 EXPORT_LOCATION = r"Exports"
     # Default: "Exports" in current directory
