@@ -85,6 +85,41 @@ def get_video_info(input_path):
         print(f"{Fore.RED}ffprobe failed: {e}{Style.RESET_ALL}")
         return 0, 0
 
+def get_video_fps(input_path):
+    """Return the FPS of the import video or None if it cannot be determined."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=avg_frame_rate,r_frame_rate",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                input_path,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+        )
+        rates = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        for rate in rates:
+            if rate in ("0/0", "N/A"):
+                continue
+            if "/" in rate:
+                numerator, denominator = rate.split("/", 1)
+                denominator_value = float(denominator)
+                if denominator_value == 0:
+                    continue
+                fps = float(numerator) / denominator_value
+            else:
+                fps = float(rate)
+            if fps > 0:
+                return fps
+    except Exception:
+        return None
+    return None
+
 def fix_video_for_seeking(input_path):
     print(f"Fixing video for seeking. This may take a moment...")
     fixed_path = os.path.splitext(input_path)[0] + "_fixed.mp4"
@@ -174,6 +209,9 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
     target_fps = parse_target_fps(getattr(preferences, "TARGET_FPS", None))
     if target_fps is not None:
         print(f"{Style.DIM}Forcing output fps to {target_fps:g}.{Style.RESET_ALL}")
+    source_fps = get_video_fps(input_path)
+    if source_fps is not None and crop_filter and "color=c=black:s=810x1440" in crop_filter:
+        print(f"{Style.DIM}Using source fps {source_fps:g} for the Call of Duty canvas.{Style.RESET_ALL}")
     # The log_level is now constant for the progress bar to work
     log_level = "info"
         
@@ -213,6 +251,8 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         
         # Add cropping filter if needed
         if crop_filter:
+            if source_fps is not None and "color=c=black:s=810x1440" in crop_filter:
+                crop_filter = crop_filter.replace("color=c=black:s=810x1440", f"color=c=black:s=810x1440:r={source_fps:g}")
             cmd.extend(["-vf", crop_filter])
         if target_fps is not None:
             cmd.extend(["-r", f"{target_fps:g}"])
