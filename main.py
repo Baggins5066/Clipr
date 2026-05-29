@@ -120,6 +120,33 @@ def get_video_fps(input_path):
         return None
     return None
 
+def get_video_resolution(input_path):
+    """Return (width, height) of the input video or (None, None) on failure."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=width,height",
+                "-of", "csv=p=0:s=x",
+                input_path,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+        )
+        out = result.stdout.strip()
+        if not out:
+            return None, None
+        parts = out.split('x')
+        if len(parts) != 2:
+            return None, None
+        return int(parts[0]), int(parts[1])
+    except Exception:
+        return None, None
+
 def fix_video_for_seeking(input_path):
     print(f"Fixing video for seeking. This may take a moment...")
     fixed_path = os.path.splitext(input_path)[0] + "_fixed.mp4"
@@ -387,6 +414,16 @@ if __name__ == "__main__":
 
     for input_path in input_paths:
         print(f"\n{Style.BRIGHT}Processing file:{Style.RESET_ALL} {Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
+        # If Call of Duty mode is selected, require source resolution 2560x1440
+        if selected_crop_ratio == 'Call of Duty':
+            w, h = get_video_resolution(input_path)
+            if w is None or h is None:
+                print(f"{Fore.YELLOW}Could not determine resolution for {os.path.basename(input_path)}; skipping.{Style.RESET_ALL}")
+                continue
+            if not (w == 2560 and h == 1440):
+                print(f"{Fore.YELLOW}Skipping {os.path.basename(input_path)}: resolution {w}x{h} != 2560x1440 required for Call of Duty mode.{Style.RESET_ALL}")
+                continue
+
         completed = split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, export_dir=preferences.EXPORT_LOCATION, crop_filter=selected_crop_filter)
         if not completed:
             break
