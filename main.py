@@ -1,8 +1,6 @@
 import os
 import sys
 import msvcrt
-import tkinter as tk
-from tkinter import filedialog
 import subprocess
 from colorama import init, Fore, Style
 from tqdm import tqdm
@@ -33,18 +31,20 @@ def get_input_with_escape(prompt):
             chars.append(ch)
             print(ch, end='', flush=True)
 
-def pick_video_file():
-    root = tk.Tk()
-    root.withdraw()
-    file_path = filedialog.askopenfilename(
-        title="Select video file",
-        filetypes=[("Video files", "*.mp4;*.avi;*.mov;*.mkv;*.flv;*.wmv;*.webm"), ("All files", "*.*")]
-    )
-    root.destroy()
-    if not file_path:
-        print("No file selected. Exiting.")
-        sys.exit(0)
-    return file_path
+def get_imported_video_files(imports_dir):
+    video_extensions = {".mp4", ".avi", ".mov", ".mkv", ".flv", ".wmv", ".webm"}
+
+    if not os.path.isdir(imports_dir):
+        os.makedirs(imports_dir, exist_ok=True)
+        return []
+
+    video_files = []
+    for entry in sorted(os.listdir(imports_dir)):
+        full_path = os.path.join(imports_dir, entry)
+        if os.path.isfile(full_path) and os.path.splitext(entry)[1].lower() in video_extensions:
+            video_files.append(full_path)
+
+    return video_files
 
 def get_video_info(input_path):
     """Return duration (seconds) and file size (bytes) using ffprobe."""
@@ -227,7 +227,13 @@ if __name__ == "__main__":
         '2.39:1': 'crop=iw:iw*1/2.39:0:ih/2',
     }
     
-    input_path = pick_video_file()
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    imports_dir = os.path.join(script_dir, "Imports")
+    input_paths = get_imported_video_files(imports_dir)
+
+    if not input_paths:
+        print(f"No video files found in {imports_dir}. Add videos there and run the script again.")
+        sys.exit(0)
 
     seconds_str = get_input_with_escape(f"Enter clip length in seconds:\n> {Fore.BLUE}").strip()
     print(Style.RESET_ALL, end='')  # Reset color after input
@@ -252,7 +258,8 @@ if __name__ == "__main__":
             selected_crop_ratio = "Invalid"
 
     # --- Preview Info --- #
-    duration, size = get_video_info(input_path)
+    first_input_path = input_paths[0]
+    duration, size = get_video_info(first_input_path)
     if duration == 0:
         print("Could not read video info, continuing without preview...")
     else:
@@ -260,7 +267,8 @@ if __name__ == "__main__":
         est_size = size  # splitting copies streams → size ≈ same as input
         estimated_clip_size = est_size / num_clips if num_clips > 0 else 0
         print(f"\n{Style.BRIGHT}Video info{Style.RESET_ALL}")
-        print(f"{Style.DIM}- Selected file: {Style.NORMAL}{Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
+        print(f"{Style.DIM}- Files found: {Style.RESET_ALL}{len(input_paths)}")
+        print(f"{Style.DIM}- First file: {Style.NORMAL}{Fore.BLUE}{os.path.basename(first_input_path)}{Style.RESET_ALL}")
         print(f"{Style.DIM}- Video duration: {Style.RESET_ALL}{format_seconds(duration)}")
         print(f"{Style.DIM}- Clip length: {Style.RESET_ALL}{format_seconds(segment_length)}")
         print(f"{Style.DIM}- Number of clips: {Style.RESET_ALL}{num_clips}")
@@ -272,4 +280,6 @@ if __name__ == "__main__":
         f"{Fore.RED}{Style.BRIGHT}\n[ESC]{Style.NORMAL} Cancel\n{Style.RESET_ALL}> "
     ).strip()
 
-    split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, export_dir=preferences.EXPORT_LOCATION, crop_filter=selected_crop_filter)
+    for input_path in input_paths:
+        print(f"\n{Style.BRIGHT}Processing file:{Style.RESET_ALL} {Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
+        split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, export_dir=preferences.EXPORT_LOCATION, crop_filter=selected_crop_filter)

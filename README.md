@@ -20,6 +20,8 @@ pip install -r requirements.txt
 
 ## Running
 
+Video files will be taken from `Imports`. It will be generated after the first run.
+
 On Windows you can run the included batch helper:
 
 ```powershell
