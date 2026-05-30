@@ -362,7 +362,12 @@ if __name__ == "__main__":
         '3:2': 'crop=iw:iw*2/3:0:ih/6',
         '16:9': 'crop=iw:iw*9/16:0:ih/8',
         '2.39:1': 'crop=iw:iw*1/2.39:0:ih/2',
-        'Call of Duty': 'split=3[minimap_capture_src][gameplay_capture_src][player_status_src];[minimap_capture_src]crop=375:350:50:30,scale=405:-1[minimap_capture];[player_status_src]crop=500:150:60:ih-180,scale=405:-1[player_status];[gameplay_capture_src]scale=810:1040:force_original_aspect_ratio=increase,crop=810:1040[gameplay_capture];color=c=black:s=810x1440[canvas];[canvas][gameplay_capture]overlay=0:0[tmp];[tmp][minimap_capture]overlay=W-w:H-h[tmp2];[tmp2][player_status]overlay=0:H-h', # Take a window in the top left of the input (the minimap) and place it at the bottom right of the canvas. Also take a window from the bottom left of the input (player_status) and place it at the bottom left of the canvas.
+        'Call of Duty': 'split=4[minimap_capture_src][gameplay_capture_src][player_status_src][weapon_status_src];[minimap_capture_src]crop=375:350:50:30,scale=405:-1[minimap_capture];[player_status_src]crop=500:150:60:ih-180,scale=405:122[player_status];[weapon_status_src]crop=630:230:iw-680:ih-270,scale=405:-1[weapon_status];[gameplay_capture_src]scale=810:1040:force_original_aspect_ratio=increase,crop=810:1040[gameplay_capture];color=c=black:s=810x1440[canvas];[canvas][gameplay_capture]overlay=0:0[tmp];[tmp][minimap_capture]overlay=W-w:H-h[tmp2];[tmp2][weapon_status]overlay=0:H-h-122[tmp3];[tmp3][player_status]overlay=0:H-h',
+            # A custom crop that captures the following areas of a 2560x1440 Call of Duty gameplay video:
+                # The gameplay area taking up the top portion of the screen, excluding most of its left and right edges
+                # The minimap placed bottom right
+                # The weapon status placed above the player status
+                # The player status placed bottom left
     }
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
