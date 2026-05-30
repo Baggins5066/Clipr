@@ -4,8 +4,13 @@ import sys
 import msvcrt
 import subprocess
 import threading
+import time
+import json
 from colorama import init, Fore, Style
 from tqdm import tqdm
+from google import genai
+from google.genai import types
+from pydantic import BaseModel
 import preferences
 
 def load_local_preferences():
@@ -21,12 +26,91 @@ def load_local_preferences():
         spec.loader.exec_module(module)
     except Exception:
         return
-    for key in ("CLIP_LENGTH", "EXPORT_LOCATION", "ENCODER", "GPU_BRAND", "CROP_RATIO", "TARGET_FPS", "SHOW_STATS"):
+    for key in ("CLIP_LENGTH", "EXPORT_LOCATION", "ENCODER", "GPU_BRAND", "CROP_RATIO", "TARGET_FPS", "SHOW_STATS", "AI_MODE", "GEMINI_API_KEY"):
         if hasattr(module, key):
             setattr(preferences, key, getattr(module, key))
 load_local_preferences()
 
 init()
+
+# -------------------- AI Processing -------------------- #
+def create_proxy_video(input_path):
+    print(f"\n{Style.DIM}Creating proxy video for AI analysis...{Style.RESET_ALL}")
+    proxy_path = os.path.splitext(input_path)[0] + "_proxy.mp4"
+    cmd = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel", "error",
+        "-i", input_path,
+        "-vf", "scale=-2:480", # Downscale to 480p height
+        "-r", "15",            # 15 fps
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "35",
+        "-c:a", "aac",
+        "-b:a", "64k",
+        "-y",
+        proxy_path
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+        print(f"{Style.DIM}Proxy video created: {os.path.basename(proxy_path)}{Style.RESET_ALL}")
+        return proxy_path
+    except subprocess.CalledProcessError as e:
+        print(f"{Fore.RED}Error creating proxy video: {e}{Style.RESET_ALL}")
+        return None
+
+class Highlight(BaseModel):
+    start_time: float
+    end_time: float
+    description: str
+
+class VideoHighlights(BaseModel):
+    highlights: list[Highlight]
+
+def analyze_video_with_gemini(proxy_path, api_key):
+    print(f"{Style.DIM}Uploading proxy video to Gemini...{Style.RESET_ALL}")
+    client = genai.Client(api_key=api_key)
+
+    try:
+        video_file = client.files.upload(file=proxy_path)
+        print(f"{Style.DIM}Uploaded as {video_file.name}. Waiting for processing...{Style.RESET_ALL}")
+
+        while video_file.state.name == "PROCESSING":
+            time.sleep(5)
+            video_file = client.files.get(name=video_file.name)
+
+        if video_file.state.name == "FAILED":
+            print(f"{Fore.RED}Gemini video processing failed.{Style.RESET_ALL}")
+            client.files.delete(name=video_file.name)
+            return None
+
+        print(f"{Style.DIM}Video processing complete. Analyzing...{Style.RESET_ALL}")
+
+        prompt = """
+        You are an expert video editor. Analyze this gameplay video and identify the most notable, exciting, or funny moments.
+        Return a list of these highlights. For each highlight, provide the start_time (in seconds), end_time (in seconds), and a brief description.
+        Try to keep clips between 10 and 60 seconds long.
+        """
+
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=[video_file, prompt],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=VideoHighlights,
+                temperature=0.2
+            )
+        )
+
+        # Clean up
+        client.files.delete(name=video_file.name)
+
+        return json.loads(response.text)
+
+    except Exception as e:
+        print(f"{Fore.RED}Error during Gemini analysis: {e}{Style.RESET_ALL}")
+        return None
 
 # -------------------- Input Helpers -------------------- #
 def get_input_with_escape(prompt):
@@ -279,6 +363,149 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
     print("✅ Processing complete!\n")
     return True
 
+def split_video_ai(input_path, highlights, encoder_type, gpu_brand, export_dir, crop_filter=None):
+    os.makedirs(export_dir, exist_ok=True)
+    base_name = os.path.splitext(os.path.basename(input_path))[0]
+
+    # Check and fix video for seeking
+    duration, _ = get_video_info(input_path)
+    if duration == 0:
+        print(f"{Fore.YELLOW}Warning: Video is not seekable. Attempting to fix...{Style.RESET_ALL}")
+        input_path = fix_video_for_seeking(input_path)
+        if not input_path:
+            return # Exit if fixing fails
+        duration, _ = get_video_info(input_path)
+
+    print(f"\nProcessing AI clips...")
+
+    if encoder_type == '1': # CPU Encoding
+        video_codec = "libx264"
+        encoder_args = ["-crf", "18", "-preset", "slow"]
+        print(f"{Style.DIM}Using CPU encoding{Style.RESET_ALL}")
+    else: # GPU Encoding
+        if gpu_brand == '1':
+            video_codec = "h264_nvenc"
+            encoder_args = ["-preset", "p6", "-rc:v", "vbr", "-cq:v", "19", "-b:v", "0"]
+            print(f"{Style.DIM}Using NVIDIA GPU encoding{Style.RESET_ALL}")
+        elif gpu_brand == '2':
+            video_codec = "h264_qsv"
+            encoder_args = ["-global_quality", "19", "-preset", "medium"]
+            print(f"{Style.DIM}Using Intel GPU encoding{Style.RESET_ALL}")
+        elif gpu_brand == '3':
+            video_codec = "h264_amf"
+            encoder_args = ["-rc", "cqp", "-qp_i", "18", "-qp_p", "18", "-quality", "quality"]
+            print(f"{Style.DIM}Using AMD GPU encoding{Style.RESET_ALL}")
+        else:
+            video_codec = "libx264"
+            encoder_args = ["-crf", "18", "-preset", "slow"]
+            print(f"{Fore.YELLOW}No valid GPU brand is selected. Reverting to CPU encoding{Style.RESET_ALL}")
+    print()
+    target_fps = parse_target_fps(getattr(preferences, "TARGET_FPS", None))
+    if target_fps is not None:
+        print(f"{Style.DIM}Forcing output fps to {target_fps:g}.{Style.RESET_ALL}")
+
+    log_level = "info"
+
+    clip_count = 0
+    total_clips = len(highlights)
+
+    for highlight in highlights:
+        clip_count += 1
+        start_time = max(0, highlight['start_time'])
+        end_time = min(duration, highlight['end_time'])
+        segment_length = max(0, end_time - start_time)
+
+        if segment_length <= 0:
+            print(f"{Fore.YELLOW}Skipping invalid clip {clip_count}/{total_clips} (length <= 0){Style.RESET_ALL}")
+            continue
+
+        start_time_str = f"{int(start_time):02d}"
+        end_time_str = f"{int(end_time):02d}"
+
+        new_filename = f"{base_name}_ai_{start_time_str}-{end_time_str}.mp4"
+        out_path = os.path.join(export_dir, new_filename)
+
+        if os.path.exists(out_path):
+            print(f"✔️ Skipping existing clip {Style.DIM}{Fore.BLUE}{new_filename}{Style.RESET_ALL} ({clip_count}/{total_clips})")
+            continue
+
+        print(f"{Style.DIM}Clip {clip_count}: {highlight.get('description', 'Highlight')}{Style.RESET_ALL}")
+
+        cmd = [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel", log_level,
+            "-ss", str(start_time),
+            "-i", input_path,
+            "-t", str(segment_length),
+            "-c:v", video_codec,
+            "-c:a", "aac",
+            "-y",
+        ]
+        cmd.extend(encoder_args)
+
+        if crop_filter:
+            cmd.extend(["-vf", crop_filter])
+        if target_fps is not None:
+            cmd.extend(["-r", f"{target_fps:g}"])
+        cmd.append(out_path)
+
+        try:
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            cancel_event = threading.Event()
+            stop_event = threading.Event()
+            did_cancel = False
+
+            with tqdm(total=segment_length, desc="🔄️", unit="s", leave=False, bar_format="{l_bar}{bar}| {percentage:.0f}%") as pbar_clip:
+                def read_ffmpeg_output():
+                    for line in process.stdout:
+                        if "time=" in line:
+                            parts = line.split()
+                            for part in parts:
+                                if part.startswith("time="):
+                                    time_str = part.split("=")[1]
+                                    try:
+                                        h, m, s = time_str.split(':')
+                                        current_time = float(h) * 3600 + float(m) * 60 + float(s)
+                                        pbar_clip.n = min(pbar_clip.total, current_time)
+                                        pbar_clip.refresh()
+                                    except ValueError:
+                                        continue
+                output_thread = threading.Thread(target=read_ffmpeg_output, daemon=True)
+                cancel_thread = threading.Thread(target=watch_for_escape, args=(cancel_event, stop_event), daemon=True)
+                output_thread.start()
+                cancel_thread.start()
+                while process.poll() is None:
+                    if cancel_event.is_set():
+                        did_cancel = True
+                        process.terminate()
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait()
+                        break
+                    cancel_event.wait(0.1)
+            output_thread.join(timeout=1)
+            stop_event.set()
+            cancel_thread.join(timeout=1)
+            return_code = process.returncode if process.returncode is not None else process.wait()
+            if did_cancel:
+                if return_code != 0 and os.path.exists(out_path):
+                    os.remove(out_path)
+                print(f"{Fore.YELLOW}Processing cancelled.{Style.RESET_ALL}")
+                return False
+            if return_code != 0:
+                raise subprocess.CalledProcessError(return_code, cmd)
+
+            print(f"➕ Created clip {Fore.BLUE}{new_filename}{Style.RESET_ALL} ({clip_count}/{total_clips})")
+
+        except subprocess.CalledProcessError as e:
+            print(f"{Fore.RED}Error processing clip {Fore.BLUE}{new_filename}{Fore.RED}: {e}{Style.RESET_ALL}")
+
+    print("✅ AI Processing complete!\n")
+    return True
+
 # -------------------- Main -------------------- #
 if __name__ == "__main__":
     
@@ -321,22 +548,33 @@ if __name__ == "__main__":
         print(f"{Fore.YELLOW}Warning: Invalid crop ratio '{selected_crop_ratio}' found in preferences. No cropping will be applied.{Style.RESET_ALL}")
         selected_crop_ratio = "Invalid"
 
+    ai_mode_enabled = getattr(preferences, "AI_MODE", False)
+    api_key = getattr(preferences, "GEMINI_API_KEY", "")
+
+    if ai_mode_enabled and not api_key:
+        print(f"{Fore.RED}Error: AI_MODE is enabled but GEMINI_API_KEY is not set in preferences.py.{Style.RESET_ALL}")
+        sys.exit(0)
+
     # --- Preview Info --- #
     first_input_path = input_paths[0]
     duration, size = get_video_info(first_input_path)
     if duration == 0:
         print("Could not read video info, continuing without preview...")
     else:
-        num_clips = int((duration + segment_length - 1) // segment_length)
-        est_size = size  # splitting copies streams → size ≈ same as input
-        estimated_clip_size = est_size / num_clips if num_clips > 0 else 0
         print(f"\n{Style.BRIGHT}Video info{Style.RESET_ALL}")
         print(f"{Style.DIM}- Files found: {Style.RESET_ALL}{len(input_paths)}")
         print(f"{Style.DIM}- First file: {Style.NORMAL}{Fore.BLUE}{os.path.basename(first_input_path)}{Style.RESET_ALL}")
         print(f"{Style.DIM}- Video duration: {Style.RESET_ALL}{format_seconds(duration)}")
-        print(f"{Style.DIM}- Clip length: {Style.RESET_ALL}{format_seconds(segment_length)}")
-        print(f"{Style.DIM}- Number of clips: {Style.RESET_ALL}{num_clips}")
-        print(f"{Style.DIM}- Estimated clip size: {Style.RESET_ALL}{estimated_clip_size/1e6:.2f} MB ({est_size/1e6:.2f} MB total)")
+        print(f"{Style.DIM}- AI Mode: {Style.RESET_ALL}{'Enabled' if ai_mode_enabled else 'Disabled'}")
+
+        if not ai_mode_enabled:
+            num_clips = int((duration + segment_length - 1) // segment_length)
+            est_size = size  # splitting copies streams → size ≈ same as input
+            estimated_clip_size = est_size / num_clips if num_clips > 0 else 0
+            print(f"{Style.DIM}- Clip length: {Style.RESET_ALL}{format_seconds(segment_length)}")
+            print(f"{Style.DIM}- Number of clips: {Style.RESET_ALL}{num_clips}")
+            print(f"{Style.DIM}- Estimated clip size: {Style.RESET_ALL}{estimated_clip_size/1e6:.2f} MB ({est_size/1e6:.2f} MB total)")
+
         print(f"{Style.DIM}- Crop: {Style.RESET_ALL}{selected_crop_ratio}")
 
     confirm = get_input_with_escape(
@@ -346,6 +584,32 @@ if __name__ == "__main__":
 
     for input_path in input_paths:
         print(f"\n{Style.BRIGHT}Processing file:{Style.RESET_ALL} {Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
-        completed = split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, export_dir=preferences.EXPORT_LOCATION, crop_filter=selected_crop_filter)
+
+        if ai_mode_enabled:
+            proxy_path = create_proxy_video(input_path)
+            if not proxy_path:
+                print(f"{Fore.RED}Skipping {os.path.basename(input_path)} due to proxy creation failure.{Style.RESET_ALL}")
+                continue
+
+            highlights_data = analyze_video_with_gemini(proxy_path, api_key)
+
+            # Clean up proxy file immediately after upload/analysis is complete
+            if os.path.exists(proxy_path):
+                try:
+                    os.remove(proxy_path)
+                except Exception as e:
+                    print(f"{Fore.YELLOW}Warning: Could not delete proxy video {proxy_path}: {e}{Style.RESET_ALL}")
+
+            if not highlights_data or 'highlights' not in highlights_data or not highlights_data['highlights']:
+                print(f"{Fore.YELLOW}No highlights identified for {os.path.basename(input_path)}. Skipping.{Style.RESET_ALL}")
+                continue
+
+            highlights = highlights_data['highlights']
+            print(f"{Fore.GREEN}Found {len(highlights)} highlights!{Style.RESET_ALL}")
+
+            completed = split_video_ai(input_path, highlights, preferences.ENCODER, preferences.GPU_BRAND, export_dir=preferences.EXPORT_LOCATION, crop_filter=selected_crop_filter)
+        else:
+            completed = split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, export_dir=preferences.EXPORT_LOCATION, crop_filter=selected_crop_filter)
+
         if not completed:
             break

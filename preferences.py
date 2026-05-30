@@ -45,3 +45,11 @@ CROP_RATIO = '9:16'
 SHOW_STATS = False
 	# [True] Advanced information will be shown during processing
 	# [False] Only essential information will be shown during processing
+
+# AI Mode: Identify notable moments with Gemini
+AI_MODE = False
+	# [True] Scans the gameplay video and splits based on highlights
+	# [False] Uses fixed-interval splitting (default)
+
+# Gemini API Key (required if AI_MODE is True)
+GEMINI_API_KEY = ""
