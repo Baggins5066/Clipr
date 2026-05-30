@@ -94,19 +94,43 @@ def analyze_video_with_gemini(proxy_path, api_key):
         """
 
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-2.0-flash-lite',
             contents=[video_file, prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 response_schema=VideoHighlights,
-                temperature=0.2
+                temperature=0.2,
+                max_output_tokens=8192
             )
         )
 
         # Clean up
         client.files.delete(name=video_file.name)
 
-        return json.loads(response.text)
+        try:
+            return json.loads(response.text)
+        except json.JSONDecodeError as e:
+            print(f"{Fore.YELLOW}Warning: JSON Decode Error from Gemini (possibly truncated): {e}{Style.RESET_ALL}")
+            print(f"{Style.DIM}Attempting to salvage valid highlights...{Style.RESET_ALL}")
+            import re
+
+            highlights = []
+            # Match any valid JSON object block inside the response
+            pattern = r'\{[^{}]*\}'
+            for match in re.finditer(pattern, response.text):
+                try:
+                    obj = json.loads(match.group(0))
+                    if 'start_time' in obj and 'end_time' in obj:
+                        highlights.append(obj)
+                except json.JSONDecodeError:
+                    pass
+
+            if highlights:
+                print(f"{Fore.GREEN}Salvaged {len(highlights)} highlights!{Style.RESET_ALL}")
+                return {"highlights": highlights}
+            else:
+                print(f"{Fore.RED}Could not salvage any highlights.{Style.RESET_ALL}")
+                return None
 
     except Exception as e:
         print(f"{Fore.RED}Error during Gemini analysis: {e}{Style.RESET_ALL}")
