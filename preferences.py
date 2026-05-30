@@ -16,7 +16,7 @@ EXPORT_LOCATION = r"Exports"
 	# Default: "Exports" in current directory
 
 # Encoding method
-ENCODER = '1'
+ENCODER = '2'
 	# [1] High quality CPU encoding
 	# [2] Fast GPU encoding
 # GPU brand (If using GPU encoding)
