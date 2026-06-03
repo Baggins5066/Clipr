@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 import sys
 import msvcrt
@@ -21,7 +22,7 @@ def load_local_preferences():
         spec.loader.exec_module(module)
     except Exception:
         return
-    for key in ("CLIP_LENGTH", "EXPORT_LOCATION", "ENCODER", "GPU_BRAND", "CROP_RATIO", "TARGET_FPS", "SHOW_STATS"):
+    for key in ("CLIP_LENGTH", "EXPORT_LOCATION", "ENCODER", "GPU_BRAND", "CROP_RATIO", "BLUR_CROP", "BLUR_STRENGTH", "TARGET_FPS", "SHOW_STATS"):
         if hasattr(module, key):
             setattr(preferences, key, getattr(module, key))
 load_local_preferences()
@@ -67,23 +68,40 @@ def get_imported_video_files(imports_dir):
     return video_files
 
 def get_video_info(input_path):
-    """Return duration (seconds) and file size (bytes) using ffprobe."""
+    """Return duration (seconds), file size (bytes), width, and height using ffprobe."""
     try:
         result = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration,size",
-             "-of", "default=noprint_wrappers=1:nokey=1", input_path],
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "format=duration,size:stream=width,height",
+                "-of",
+                "json",
+                input_path,
+            ],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True
         )
-        duration_str, size_str = result.stdout.strip().splitlines()
+        data = json.loads(result.stdout)
+        format_data = data.get("format", {})
+        streams = data.get("streams", [])
+        stream_data = streams[0] if streams else {}
 
-        # Check for 'N/A' and set to 0
-        duration = float(duration_str) if duration_str != 'N/A' else 0
-        size = int(size_str) if size_str != 'N/A' else 0
+        duration_text = format_data.get("duration", "0")
+        size_text = format_data.get("size", "0")
 
-        return duration, size
+        duration = float(duration_text) if duration_text not in (None, "N/A") else 0
+        size = int(size_text) if size_text not in (None, "N/A") else 0
+        width = int(stream_data.get("width", 0) or 0)
+        height = int(stream_data.get("height", 0) or 0)
+
+        return duration, size, width, height
     except Exception as e:
         print(f"{Fore.RED}ffprobe failed: {e}{Style.RESET_ALL}")
-        return 0, 0
+        return 0, 0, 0, 0
 
 def fix_video_for_seeking(input_path):
     print(f"Fixing video for seeking. This may take a moment...")
@@ -133,19 +151,97 @@ def parse_target_fps(value):
         return None
     return fps if fps > 0 else None
 
+def parse_aspect_ratio(value, source_aspect_ratio=None):
+    if value in (None, "", 0, "0", "Off", "off"):
+        return None
+    if isinstance(value, str) and value.lower() == "source":
+        return source_aspect_ratio
+    try:
+        if isinstance(value, str) and ":" in value:
+            numerator, denominator = value.split(":", 1)
+            ratio = float(numerator) / float(denominator)
+        else:
+            ratio = float(value)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+    return ratio if ratio > 0 else None
+
+def even_dimension(value):
+    value = int(round(value))
+    if value < 2:
+        return 2
+    return value if value % 2 == 0 else value - 1
+
+def build_center_crop_filter(source_width, source_height, target_aspect_ratio):
+    if source_width <= 0 or source_height <= 0 or target_aspect_ratio is None:
+        return None
+
+    source_aspect_ratio = source_width / source_height
+    if abs(source_aspect_ratio - target_aspect_ratio) < 1e-6:
+        crop_width = source_width
+        crop_height = source_height
+        crop_x = 0
+        crop_y = 0
+    elif source_aspect_ratio > target_aspect_ratio:
+        crop_height = source_height
+        crop_width = min(source_width, even_dimension(source_height * target_aspect_ratio))
+        crop_x = max((source_width - crop_width) // 2, 0)
+        crop_y = 0
+    else:
+        crop_width = source_width
+        crop_height = min(source_height, even_dimension(source_width / target_aspect_ratio))
+        crop_x = 0
+        crop_y = max((source_height - crop_height) // 2, 0)
+
+    return f"crop={crop_width}:{crop_height}:{crop_x}:{crop_y}"
+
+def build_blur_canvas_filter(source_width, source_height, canvas_aspect_ratio, video_aspect_ratio):
+    if source_width <= 0 or source_height <= 0 or canvas_aspect_ratio is None or video_aspect_ratio is None:
+        return None
+
+    crop_filter = build_center_crop_filter(source_width, source_height, video_aspect_ratio)
+    if not crop_filter:
+        return None
+
+    if canvas_aspect_ratio >= 1:
+        canvas_width = even_dimension(source_width)
+        canvas_height = even_dimension(source_width / canvas_aspect_ratio)
+    else:
+        canvas_height = even_dimension(source_height)
+        canvas_width = even_dimension(source_height * canvas_aspect_ratio)
+
+    canvas_width = max(canvas_width, 2)
+    canvas_height = max(canvas_height, 2)
+
+    if video_aspect_ratio >= canvas_aspect_ratio:
+        scaled_width = canvas_width
+        scaled_height = even_dimension(canvas_width / video_aspect_ratio)
+    else:
+        scaled_height = canvas_height
+        scaled_width = even_dimension(canvas_height * video_aspect_ratio)
+
+    scaled_width = min(max(scaled_width, 2), canvas_width)
+    scaled_height = min(max(scaled_height, 2), canvas_height)
+
+    return (
+        f"{crop_filter},"
+        f"scale={scaled_width}:{scaled_height},"
+        f"pad={canvas_width}:{canvas_height}:(ow-iw)/2:(oh-ih)/2:color=black"
+    )
+
 # -------------------- Splitting -------------------- #
-def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, export_dir, crop_filter=None):
+def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, export_dir, crop_filter=None, blur_crop_ratio=None, canvas_ratio=None):
     os.makedirs(export_dir, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(input_path))[0]
     
     # Check and fix video for seeking
-    duration, _ = get_video_info(input_path)
+    duration, _, source_width, source_height = get_video_info(input_path)
     if duration == 0:
         print(f"{Fore.YELLOW}Warning: Video is not seekable. Attempting to fix...{Style.RESET_ALL}")
         input_path = fix_video_for_seeking(input_path)
         if not input_path:
             return # Exit if fixing fails
-        duration, _ = get_video_info(input_path) # Get duration of the new fixed file
+        duration, _, source_width, source_height = get_video_info(input_path) # Get duration of the new fixed file
 
     print(f"\nProcessing clips...")
 
@@ -176,6 +272,17 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         print(f"{Style.DIM}Forcing output fps to {target_fps:g}.{Style.RESET_ALL}")
     # The log_level is now constant for the progress bar to work
     log_level = "info"
+    blur_filter = None
+    if blur_crop_ratio not in (None, "", "Off", "off"):
+        blur_filter = build_blur_canvas_filter(
+            source_width,
+            source_height,
+            parse_aspect_ratio(canvas_ratio, source_width / source_height),
+            parse_aspect_ratio(blur_crop_ratio),
+        )
+        if not blur_filter:
+            print(f"{Fore.RED}Unable to build Blur Crop filter for {os.path.basename(input_path)}.{Style.RESET_ALL}")
+            return False
         
     start_time = 0
     clip_count = 0
@@ -212,7 +319,9 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         cmd.extend(encoder_args)
         
         # Add cropping filter if needed
-        if crop_filter:
+        if blur_filter:
+            cmd.extend(["-vf", blur_filter])
+        elif crop_filter:
             cmd.extend(["-vf", crop_filter])
         if target_fps is not None:
             cmd.extend(["-r", f"{target_fps:g}"])
@@ -323,10 +432,10 @@ if __name__ == "__main__":
         if not selected_crop_filter:
             print(f"{Fore.YELLOW}Warning: Invalid crop ratio '{selected_crop_ratio}' found in preferences. No cropping will be applied.{Style.RESET_ALL}")
             selected_crop_ratio = "Invalid"
-
+    selected_blur_crop = getattr(preferences, "BLUR_CROP", None)
     # --- Preview Info --- #
     first_input_path = input_paths[0]
-    duration, size = get_video_info(first_input_path)
+    duration, size, _, _ = get_video_info(first_input_path)
     if duration == 0:
         print("Could not read video info, continuing without preview...")
     else:
@@ -341,7 +450,8 @@ if __name__ == "__main__":
         print(f"{Style.DIM}- Number of clips: {Style.RESET_ALL}{num_clips}")
         print(f"{Style.DIM}- Estimated clip size: {Style.RESET_ALL}{estimated_clip_size/1e6:.2f} MB ({est_size/1e6:.2f} MB total)")
         print(f"{Style.DIM}- Crop: {Style.RESET_ALL}{selected_crop_ratio}")
-
+        if selected_blur_crop not in (None, "", "Off", "off"):
+            print(f"{Style.DIM}- Blur crop: {Style.RESET_ALL}{selected_blur_crop}")
     confirm = get_input_with_escape(
         f"{Fore.GREEN}{Style.BRIGHT}\n[ENTER]{Style.NORMAL} Start processing{Style.RESET_ALL}"
         f"{Fore.RED}{Style.BRIGHT}\n[ESC]{Style.NORMAL} Cancel\n{Style.RESET_ALL}> "
@@ -349,6 +459,15 @@ if __name__ == "__main__":
 
     for input_path in input_paths:
         print(f"\n{Style.BRIGHT}Processing file:{Style.RESET_ALL} {Fore.BLUE}{os.path.basename(input_path)}{Style.RESET_ALL}")
-        completed = split_video_ffmpeg(input_path, segment_length, preferences.ENCODER, preferences.GPU_BRAND, export_dir=preferences.EXPORT_LOCATION, crop_filter=selected_crop_filter)
+        completed = split_video_ffmpeg(
+            input_path,
+            segment_length,
+            preferences.ENCODER,
+            preferences.GPU_BRAND,
+            export_dir=preferences.EXPORT_LOCATION,
+            crop_filter=selected_crop_filter,
+            blur_crop_ratio=selected_blur_crop,
+            canvas_ratio=preferences.CROP_RATIO,
+        )
         if not completed:
             break
