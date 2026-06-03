@@ -55,8 +55,8 @@ BLUR_CROP = 'Off' # Crops clips within the frame and applies a blurred backgroun
 	# [7:5] (Horizontal)
 	# [3:2] (Horizontal)
 	# [16:9] (Horizontal)
-BLUR_STRENGTH = 50 # Strength of the blur applied when using Blur Crop
-	# Default: 50 [0-100]
+BLUR_STRENGTH = 30 # Strength of the blur applied when using Blur Crop
+	# Default: 30 [0-100]
 
 # Show stats during processing
 SHOW_STATS = False
