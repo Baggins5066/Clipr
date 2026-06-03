@@ -26,7 +26,8 @@ GPU_BRAND = '1'
 	# [3] AMD
 
 # Crop ratio
-CROP_RATIO = '9:16'
+CROP_RATIO = 'Source'
+	# Default: Source
 	# 1:2 (Vertical)
 	# 9:16 (Vertical)
 	# 2:3 (Vertical)

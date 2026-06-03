@@ -387,10 +387,13 @@ if __name__ == "__main__":
 
     # Use crop ratio from preferences
     selected_crop_ratio = preferences.CROP_RATIO
-    selected_crop_filter = CROP_FILTERS.get(selected_crop_ratio, None)
-    if not selected_crop_filter:
-        print(f"{Fore.YELLOW}Warning: Invalid crop ratio '{selected_crop_ratio}' found in preferences. No cropping will be applied.{Style.RESET_ALL}")
-        selected_crop_ratio = "Invalid"
+    if selected_crop_ratio == "Source":
+        selected_crop_filter = None
+    else:
+        selected_crop_filter = CROP_FILTERS.get(selected_crop_ratio, None)
+        if not selected_crop_filter:
+            print(f"{Fore.YELLOW}Warning: Invalid crop ratio '{selected_crop_ratio}' found in preferences. No cropping will be applied.{Style.RESET_ALL}")
+            selected_crop_ratio = "Invalid"
 
     # --- Preview Info --- #
     first_input_path = input_paths[0]
