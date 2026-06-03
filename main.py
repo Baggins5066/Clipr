@@ -195,7 +195,7 @@ def build_center_crop_filter(source_width, source_height, target_aspect_ratio):
 
     return f"crop={crop_width}:{crop_height}:{crop_x}:{crop_y}"
 
-def build_blur_canvas_filter(source_width, source_height, canvas_aspect_ratio, video_aspect_ratio):
+def build_blur_canvas_filter(source_width, source_height, canvas_aspect_ratio, video_aspect_ratio, blur_strength=20):
     if source_width <= 0 or source_height <= 0 or canvas_aspect_ratio is None or video_aspect_ratio is None:
         return None
 
@@ -212,21 +212,21 @@ def build_blur_canvas_filter(source_width, source_height, canvas_aspect_ratio, v
 
     canvas_width = max(canvas_width, 2)
     canvas_height = max(canvas_height, 2)
-
-    if video_aspect_ratio >= canvas_aspect_ratio:
-        scaled_width = canvas_width
-        scaled_height = even_dimension(canvas_width / video_aspect_ratio)
-    else:
-        scaled_height = canvas_height
-        scaled_width = even_dimension(canvas_height * video_aspect_ratio)
-
-    scaled_width = min(max(scaled_width, 2), canvas_width)
-    scaled_height = min(max(scaled_height, 2), canvas_height)
+    blur_sigma = max(float(blur_strength) / 6.0, 0.5)
+    blur_scale_width = max(2, even_dimension(canvas_width // 3))
+    blur_scale_height = max(2, even_dimension(canvas_height // 3))
 
     return (
-        f"{crop_filter},"
-        f"scale={scaled_width}:{scaled_height},"
-        f"pad={canvas_width}:{canvas_height}:(ow-iw)/2:(oh-ih)/2:color=black"
+        f"[0:v]split=2[bgsrc][fgsrc];"
+        f"[bgsrc]{crop_filter},setsar=1,"
+        f"scale={canvas_width}:{canvas_height}:force_original_aspect_ratio=increase,"
+        f"crop={canvas_width}:{canvas_height},"
+        f"scale={blur_scale_width}:{blur_scale_height}:flags=lanczos,"
+        f"gblur=sigma={blur_sigma}:steps=2,"
+        f"scale={canvas_width}:{canvas_height}:flags=lanczos[bg];"
+        f"[fgsrc]{crop_filter},setsar=1,"
+        f"scale={canvas_width}:{canvas_height}:force_original_aspect_ratio=decrease[fg];"
+        f"[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p[vout]"
     )
 
 # -------------------- Splitting -------------------- #
@@ -279,6 +279,7 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
             source_height,
             parse_aspect_ratio(canvas_ratio, source_width / source_height),
             parse_aspect_ratio(blur_crop_ratio),
+            getattr(preferences, "BLUR_STRENGTH", 20),
         )
         if not blur_filter:
             print(f"{Fore.RED}Unable to build Blur Crop filter for {os.path.basename(input_path)}.{Style.RESET_ALL}")
@@ -320,7 +321,7 @@ def split_video_ffmpeg(input_path, segment_length, encoder_type, gpu_brand, expo
         
         # Add cropping filter if needed
         if blur_filter:
-            cmd.extend(["-vf", blur_filter])
+            cmd.extend(["-filter_complex", blur_filter, "-map", "[vout]", "-map", "0:a?"])
         elif crop_filter:
             cmd.extend(["-vf", crop_filter])
         if target_fps is not None:
